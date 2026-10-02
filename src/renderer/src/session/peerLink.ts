@@ -7,12 +7,17 @@ import {
 } from '../Utils'
 import type { ControlMessage } from './controlProtocol'
 import { parseControlMessage, serializeControlMessage } from './controlProtocol'
+import { debugLog } from '../debugLog.svelte'
 import { ICE_GATHERING_TIMEOUT_MS } from './constants'
 import {
-  iceCandidateKind,
-  type IceCandidateKind,
+  candidateSummary,
+  iceCandidateEvidence,
+  sanitizeIceServerUrl,
+  selectedPairEvidence,
+  type IceCandidateEvidence,
   type IceFailureEvidence,
   type IceServerError,
+  type SelectedPairEvidence,
 } from './iceFailure'
 import { decodeMlsFrame, encodeMlsFrame, type MlsFrame } from '../crypto/mlsWire'
 import { asBufferSource } from '../crypto/constants'
@@ -81,7 +86,7 @@ export class PeerLink {
   }> = []
   private pendingMotion: string | null = null
   private motionFlushTimer: ReturnType<typeof setTimeout> | null = null
-  private readonly candidateTypes = new Set<IceCandidateKind>()
+  private readonly candidates: IceCandidateEvidence[] = []
   private readonly serverErrors: IceServerError[] = []
   private gatheringTimedOut = false
   private readonly keepRoutableIpv6: boolean
@@ -106,17 +111,49 @@ export class PeerLink {
       this.events.onIceConnectionStateChange(this.pc.iceConnectionState)
     }
     this.pc.onicecandidate = (event: RTCPeerConnectionIceEvent): void => {
-      const kind = iceCandidateKind(event.candidate)
-      if (kind) this.candidateTypes.add(kind)
+      const evidence = iceCandidateEvidence(event.candidate)
+      if (evidence) {
+        this.candidates.push(evidence)
+        debugLog.info('ice', 'candidate', {
+          pendingId: this.pendingId,
+          remotePeerId: this.remotePeerId,
+          type: evidence.type,
+          protocol: evidence.protocol,
+          addressFamily: evidence.addressFamily,
+        })
+      } else if (!event.candidate) {
+        debugLog.info('ice', 'gathering complete', {
+          pendingId: this.pendingId,
+          remotePeerId: this.remotePeerId,
+          candidates: candidateSummary(this.candidates),
+        })
+      }
       this.events.onIceCandidate?.(event.candidate ? event.candidate.toJSON() : null)
     }
     this.pc.onicecandidateerror = (event: RTCPeerConnectionIceErrorEvent): void => {
-      this.serverErrors.push({
-        url: event.url ?? '',
+      const url = sanitizeIceServerUrl(event.url ?? '')
+      const error = {
+        url,
         code: event.errorCode,
         text: event.errorText ?? '',
+      }
+      this.serverErrors.push(error)
+      debugLog.warn('ice', 'candidate error', {
+        pendingId: this.pendingId,
+        remotePeerId: this.remotePeerId,
+        url: error.url,
+        errorCode: error.code,
+        errorText: error.text,
       })
     }
+    this.pc.addEventListener('icegatheringstatechange', () => {
+      debugLog.info('ice', 'gathering state', {
+        pendingId: this.pendingId,
+        remotePeerId: this.remotePeerId,
+        state: this.pc.iceGatheringState,
+        candidates: candidateSummary(this.candidates),
+      })
+    })
     this.pc.onnegotiationneeded = (): void => {
       void this.onNegotiationNeeded()
     }
@@ -174,9 +211,17 @@ export class PeerLink {
 
   iceEvidence(): IceFailureEvidence {
     return {
-      candidateTypes: [...this.candidateTypes],
+      candidates: this.candidates.map((candidate) => ({ ...candidate })),
       serverErrors: this.serverErrors.map((error) => ({ ...error })),
       gatheringTimedOut: this.gatheringTimedOut,
+    }
+  }
+
+  async selectedCandidatePair(): Promise<SelectedPairEvidence | null> {
+    try {
+      return selectedPairEvidence(await this.pc.getStats())
+    } catch {
+      return null
     }
   }
 

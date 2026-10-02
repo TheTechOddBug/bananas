@@ -1,18 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import {
+  candidateSummary,
   connectionFailureForState,
+  iceCandidateEvidence,
   iceCandidateKind,
+  isTcpTurnUrl,
   isWebRtcSdpError,
+  sanitizeIceServerUrl,
+  selectedPairEvidence,
   summarizeIceFailure,
+  type IceCandidateEvidence,
+  type IceCandidateKind,
   type IceFailureEvidence,
   type IceServerError,
 } from './iceFailure'
 
-const evidence = (patch: Partial<IceFailureEvidence> = {}): IceFailureEvidence => ({
-  candidateTypes: [],
-  serverErrors: [],
-  gatheringTimedOut: false,
-  ...patch,
+const candidate = (
+  type: IceCandidateKind,
+  protocol: IceCandidateEvidence['protocol'] = 'udp',
+  addressFamily: IceCandidateEvidence['addressFamily'] = 'ipv4',
+): IceCandidateEvidence => ({ type, protocol, addressFamily })
+
+const evidence = (
+  patch: Partial<IceFailureEvidence> & { candidateTypes?: readonly IceCandidateKind[] } = {},
+): IceFailureEvidence => ({
+  candidates: patch.candidates ?? (patch.candidateTypes ?? []).map((type) => candidate(type)),
+  serverErrors: patch.serverErrors ?? [],
+  gatheringTimedOut: patch.gatheringTimedOut ?? false,
 })
 
 const server = (patch: Partial<IceServerError> = {}): IceServerError => ({
@@ -94,6 +108,58 @@ describe('summarizeIceFailure', () => {
       kind: 'relay-failed',
     })
   })
+
+  it('does not treat an incidental TCP TURN error as the cause when candidates were gathered', () => {
+    const tcpTurn = server({ url: 'turn:turn.example:3478?transport=tcp', code: 701 })
+    expect(
+      summarizeIceFailure(
+        evidence({
+          candidateTypes: ['host', 'srflx', 'relay'],
+          serverErrors: [tcpTurn],
+        }),
+      ),
+    ).toEqual({ kind: 'relay-failed' })
+    expect(
+      summarizeIceFailure(
+        evidence({
+          candidates: [candidate('relay', 'udp', 'ipv4')],
+          serverErrors: [tcpTurn],
+        }),
+      ),
+    ).toEqual({ kind: 'relay-failed' })
+    expect(
+      summarizeIceFailure(
+        evidence({
+          candidateTypes: ['host'],
+          serverErrors: [tcpTurn],
+        }),
+      ),
+    ).toEqual({ kind: 'host-only' })
+  })
+
+  it('uses a non-TCP server error when nothing usable was gathered', () => {
+    expect(
+      summarizeIceFailure(
+        evidence({
+          serverErrors: [
+            server({ url: 'turn:turn.example:3478?transport=tcp', code: 701 }),
+            server({ url: 'stun:stun.example:19302', code: 701 }),
+          ],
+        }),
+      ),
+    ).toEqual({ kind: 'unreachable', url: 'stun:stun.example:19302', code: 701 })
+    expect(
+      summarizeIceFailure(
+        evidence({
+          serverErrors: [server({ url: 'turn:turn.example:3478?transport=tcp', code: 701 })],
+        }),
+      ),
+    ).toEqual({
+      kind: 'unreachable',
+      url: 'turn:turn.example:3478?transport=tcp',
+      code: 701,
+    })
+  })
 })
 
 describe('connectionFailureForState', () => {
@@ -118,6 +184,85 @@ describe('iceCandidateKind', () => {
     ).toBe('srflx')
     expect(iceCandidateKind({ type: 'relay', candidate: '' })).toBe('relay')
     expect(iceCandidateKind(null)).toBeNull()
+  })
+})
+
+describe('ice candidate evidence', () => {
+  it('summarizes type, protocol, and family without the address', () => {
+    const parsed = iceCandidateEvidence({
+      candidate: 'candidate:1 1 UDP 2122260223 192.168.1.123 54400 typ host',
+    })
+    expect(parsed).toEqual({ type: 'host', protocol: 'udp', addressFamily: 'ipv4' })
+    const summary = candidateSummary(parsed ? [parsed] : [])
+    expect(summary).toEqual({ hostUdpIpv4: 1 })
+    const serialized = JSON.stringify({ parsed, summary })
+    expect(serialized).not.toContain('192.168.1.123')
+    expect(serialized).not.toContain('54400')
+  })
+
+  it('reads protocol and family from candidate fields and drops credentials from server URLs', () => {
+    expect(
+      iceCandidateEvidence({
+        type: 'relay',
+        protocol: 'tcp',
+        address: '2001:db8::10',
+        candidate: 'candidate:9 1 TCP 1 2001:db8::10 9 typ relay',
+      }),
+    ).toEqual({ type: 'relay', protocol: 'tcp', addressFamily: 'ipv6' })
+    expect(
+      iceCandidateEvidence({
+        candidate: 'candidate:5 1 udp 1 2600-abc.local 9 typ host',
+      })?.addressFamily,
+    ).toBe('unknown')
+    const url = sanitizeIceServerUrl('turn:user:pass@turn.example:3478?transport=tcp')
+    expect(url).toBe('turn:turn.example:3478?transport=tcp')
+    expect(url).not.toContain('user:pass@')
+    expect(isTcpTurnUrl(url)).toBe(true)
+    expect(isTcpTurnUrl('turn:turn.example:3478')).toBe(false)
+    expect(isTcpTurnUrl('stun:stun.example:19302?transport=tcp')).toBe(false)
+  })
+})
+
+describe('selectedPairEvidence', () => {
+  it('reports the nominated pair without addresses', () => {
+    const report = {
+      forEach: (callback: (stat: Record<string, unknown>) => void): void => {
+        for (const stat of [
+          {
+            id: 'pair',
+            type: 'candidate-pair',
+            state: 'succeeded',
+            nominated: true,
+            localCandidateId: 'local',
+            remoteCandidateId: 'remote',
+          },
+          {
+            id: 'local',
+            type: 'local-candidate',
+            candidateType: 'host',
+            protocol: 'udp',
+            address: '192.168.1.123',
+          },
+          {
+            id: 'remote',
+            type: 'remote-candidate',
+            candidateType: 'relay',
+            protocol: 'tcp',
+            address: '203.0.113.10',
+          },
+        ]) {
+          callback(stat)
+        }
+      },
+    }
+    const pair = selectedPairEvidence(report)
+    expect(pair).toEqual({
+      local: { type: 'host', protocol: 'udp', addressFamily: 'ipv4' },
+      remote: { type: 'relay', protocol: 'tcp', addressFamily: 'ipv4' },
+    })
+    expect(JSON.stringify(pair)).not.toContain('192.168.1.123')
+    expect(JSON.stringify(pair)).not.toContain('203.0.113.10')
+    expect(selectedPairEvidence(null)).toBeNull()
   })
 })
 

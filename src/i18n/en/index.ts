@@ -66,6 +66,7 @@ const en = {
   connection_ice_auth:
     'The STUN or TURN server rejected the login for {url} (code {code}). Check the username and password in Settings.',
   connection_ice_unreachable: 'Could not reach the STUN or TURN server {url} (code {code}).',
+  connection_ice_tcp_unreachable: 'Could not reach the TCP TURN server {url} (code {code}).',
   connection_ice_gathering_timeout:
     'Address gathering timed out before a public or relay address appeared. Check the STUN server in Settings, or add a TURN server.',
   connection_ice_host_only:

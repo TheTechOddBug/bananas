@@ -5,8 +5,8 @@ import {
   ConnectionType,
   answerDescriptionForRemote,
   cloneSessionDescription,
-  dropTcpIceCandidates,
   getConnectionString,
+  pruneRedundantIceCandidates,
   getUUIDv4,
   isUnusableIpv6IceCandidate,
   mediaTrackConstraints,
@@ -77,7 +77,12 @@ import {
   type VoteKind,
   type VoteState,
 } from './roomLogic'
-import { connectionFailureForState, summarizeIceFailure, type IceFailureReason } from './iceFailure'
+import {
+  candidateSummary,
+  connectionFailureForState,
+  summarizeIceFailure,
+  type IceFailureReason,
+} from './iceFailure'
 import { playSessionEndedSound } from './sessionEndedSound'
 import { playCursorPingSound } from './cursorPingSound'
 import {
@@ -173,6 +178,7 @@ export class Room {
   private foregroundColor = '#1a1a1a'
   private backgroundColor = '#ffffff'
   private links = new Map<string, PeerLink>()
+  private selectedPairLogged = new WeakSet<PeerLink>()
   private remoteVideoStreams = new Map<string, MediaStream>()
   private remoteVideoByStreamId = new Map<string, { peerId: string; stream: MediaStream }>()
   private remoteCameraState = new Map<string, { enabled: boolean; streamId: string }>()
@@ -671,11 +677,10 @@ export class Room {
     this.links.set(link.pendingId, link)
     this.lastCopiedPendingId = link.pendingId
     this.username = data.username || this.username
-    const url = await getConnectionString(
-      ConnectionType.HOST,
-      dropTcpIceCandidates(link.localDescription ?? offer),
-      { username: this.username, invite: this.invite },
-    )
+    const url = await getConnectionString(ConnectionType.HOST, link.localDescription ?? offer, {
+      username: this.username,
+      invite: this.invite,
+    })
     debugLog.info('room', 'CreateHostUrl copied host string', {
       pendingId: link.pendingId,
       urlChars: url.length,
@@ -1538,7 +1543,10 @@ export class Room {
             remotePeerId: link.remotePeerId,
             pc: summarizePc(link.pc),
           })
-          if (state === 'connected') this.markLive(link)
+          if (state === 'connected') {
+            this.markLive(link)
+            this.logSelectedCandidatePair(link)
+          }
           if (state === 'failed' || state === 'closed') {
             void this.handleRemoteDeparted(link, false)
           }
@@ -1567,7 +1575,7 @@ export class Room {
               v: PROTOCOL_VERSION,
               from: this.localPeerId,
               to: link.remotePeerId,
-              sdp,
+              sdp: pruneRedundantIceCandidates(sdp),
             },
             link,
           )
@@ -1939,7 +1947,7 @@ export class Room {
         v: PROTOCOL_VERSION,
         from: this.localPeerId,
         to: targetId,
-        sdp: dropTcpIceCandidates(link.localDescription ?? offer),
+        sdp: pruneRedundantIceCandidates(link.localDescription ?? offer),
       },
       link,
     )
@@ -2422,6 +2430,7 @@ export class Room {
     if (state === 'connected' || state === 'completed') {
       this.markLive(link)
       this.setConnectionState('connected')
+      this.logSelectedCandidatePair(link)
       return
     }
     if (state === 'failed' || state === 'closed') {
@@ -2435,6 +2444,20 @@ export class Room {
       }, ICE_DISCONNECT_GRACE_MS)
       this.iceGraceTimers.set(key, timer)
     }
+  }
+
+  private logSelectedCandidatePair(link: PeerLink): void {
+    if (this.selectedPairLogged.has(link)) return
+    void link.selectedCandidatePair().then((pair) => {
+      if (!pair || this.selectedPairLogged.has(link)) return
+      this.selectedPairLogged.add(link)
+      debugLog.info('room', 'selected candidate pair', {
+        pendingId: link.pendingId,
+        remotePeerId: link.remotePeerId,
+        local: pair.local,
+        remote: pair.remote,
+      })
+    })
   }
 
   private markLive(link: PeerLink): void {
@@ -2457,6 +2480,20 @@ export class Room {
     this.closing.add(key)
     const iceEvidence = link.iceEvidence()
     const peerId = link.remotePeerId
+    if (!link.established) {
+      debugLog.warn('room', 'ice failure', {
+        pendingId: link.pendingId,
+        remotePeerId: link.remotePeerId,
+        connectionState: link.connectionState,
+        iceConnectionState: link.iceConnectionState,
+        iceGatheringState: link.pc.iceGatheringState,
+        candidates: candidateSummary(iceEvidence.candidates),
+        serverErrors: iceEvidence.serverErrors,
+        gatheringTimedOut: iceEvidence.gatheringTimedOut,
+        established: link.established,
+        failure: summarizeIceFailure(iceEvidence),
+      })
+    }
     this.clearIceGrace(key)
     this.stopAdaptive(link)
     link.close()

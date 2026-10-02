@@ -262,6 +262,12 @@ type RootTranslation = {
 	 */
 	connection_ice_unreachable: RequiredParams<'code' | 'url'>
 	/**
+	 * C​o​u​l​d​ ​n​o​t​ ​r​e​a​c​h​ ​t​h​e​ ​T​C​P​ ​T​U​R​N​ ​s​e​r​v​e​r​ ​{​u​r​l​}​ ​(​c​o​d​e​ ​{​c​o​d​e​}​)​.
+	 * @param {unknown} code
+	 * @param {unknown} url
+	 */
+	connection_ice_tcp_unreachable: RequiredParams<'code' | 'url'>
+	/**
 	 * A​d​d​r​e​s​s​ ​g​a​t​h​e​r​i​n​g​ ​t​i​m​e​d​ ​o​u​t​ ​b​e​f​o​r​e​ ​a​ ​p​u​b​l​i​c​ ​o​r​ ​r​e​l​a​y​ ​a​d​d​r​e​s​s​ ​a​p​p​e​a​r​e​d​.​ ​C​h​e​c​k​ ​t​h​e​ ​S​T​U​N​ ​s​e​r​v​e​r​ ​i​n​ ​S​e​t​t​i​n​g​s​,​ ​o​r​ ​a​d​d​ ​a​ ​T​U​R​N​ ​s​e​r​v​e​r​.
 	 */
 	connection_ice_gathering_timeout: string
@@ -937,6 +943,10 @@ export type TranslationFunctions = {
 	 * Could not reach the STUN or TURN server {url} (code {code}).
 	 */
 	connection_ice_unreachable: (arg: { code: unknown, url: unknown }) => LocalizedString
+	/**
+	 * Could not reach the TCP TURN server {url} (code {code}).
+	 */
+	connection_ice_tcp_unreachable: (arg: { code: unknown, url: unknown }) => LocalizedString
 	/**
 	 * Address gathering timed out before a public or relay address appeared. Check the STUN server in Settings, or add a TURN server.
 	 */

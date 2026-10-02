@@ -66,6 +66,8 @@ const pt_br = {
     'O servidor STUN ou TURN recusou o login de {url} (código {code}). Confira o usuário e a senha em Configurações.',
   connection_ice_unreachable:
     'Não foi possível alcançar o servidor STUN ou TURN {url} (código {code}).',
+  connection_ice_tcp_unreachable:
+    'Não foi possível alcançar o servidor TURN TCP {url} (código {code}).',
   connection_ice_gathering_timeout:
     'A busca de endereços expirou antes de aparecer um endereço público ou de relay. Confira o servidor STUN em Configurações ou adicione um servidor TURN.',
   connection_ice_host_only:

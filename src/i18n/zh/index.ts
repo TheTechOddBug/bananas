@@ -62,6 +62,7 @@ const zh = {
   connection_ice_auth:
     'STUN 或 TURN 服务器拒绝了 {url} 的登录（代码 {code}）。请在设置中检查用户名和密码。',
   connection_ice_unreachable: '无法连接 STUN 或 TURN 服务器 {url}（代码 {code}）。',
+  connection_ice_tcp_unreachable: '无法连接 TCP TURN 服务器 {url}（代码 {code}）。',
   connection_ice_gathering_timeout:
     '地址收集在出现公网或中继地址之前超时。请在设置中检查 STUN 服务器，或添加 TURN 服务器。',
   connection_ice_host_only:

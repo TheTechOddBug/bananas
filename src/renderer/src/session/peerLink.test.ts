@@ -354,20 +354,33 @@ describe('PeerLink ICE diagnostics', () => {
         errorCode: 701,
         errorText: 'STUN server timed out',
       } as RTCPeerConnectionIceErrorEvent)
+      pc.onicecandidateerror?.({
+        url: 'turn:user:pass@turn.example:3478?transport=tcp',
+        errorCode: 701,
+        errorText: 'TURN allocate failed',
+      } as RTCPeerConnectionIceErrorEvent)
       const pending = link.waitForIceGatheringComplete()
       await vi.advanceTimersByTimeAsync(ICE_GATHERING_TIMEOUT_MS)
       await pending
-      expect(link.iceEvidence()).toEqual({
-        candidateTypes: ['host'],
+      const recorded = link.iceEvidence()
+      expect(recorded).toEqual({
+        candidates: [{ type: 'host', protocol: 'udp', addressFamily: 'ipv4' }],
         serverErrors: [
           {
             url: 'stun:stun.l.google.com:19302',
             code: 701,
             text: 'STUN server timed out',
           },
+          {
+            url: 'turn:turn.example:3478?transport=tcp',
+            code: 701,
+            text: 'TURN allocate failed',
+          },
         ],
         gatheringTimedOut: true,
       })
+      expect(JSON.stringify(recorded)).not.toContain('10.0.0.1')
+      expect(JSON.stringify(recorded)).not.toContain('user:pass@')
     } finally {
       vi.useRealTimers()
     }

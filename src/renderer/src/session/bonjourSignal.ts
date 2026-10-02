@@ -1,4 +1,4 @@
-import { cloneIceCandidate, dropTcpIceCandidates } from '../Utils'
+import { cloneIceCandidate, pruneRedundantIceCandidates } from '../Utils'
 import type { InviteCrypto } from '../crypto/invite'
 
 export type BonjourSignalType = 'offer' | 'answer' | 'ice' | 'mls-invite' | 'hangup'
@@ -28,7 +28,7 @@ export const shouldNotifyIncomingCall = (opts: { inSession: boolean; kind: strin
 
 export const cloneBonjourPayload = (payload: BonjourSignalPayload): BonjourSignalPayload => ({
   type: payload.type,
-  sdp: payload.sdp ? dropTcpIceCandidates(payload.sdp) : undefined,
+  sdp: payload.sdp ? pruneRedundantIceCandidates(payload.sdp) : undefined,
   candidate: payload.candidate ? cloneIceCandidate(payload.candidate) : undefined,
   invite: payload.invite ? { ...payload.invite } : payload.invite,
 })

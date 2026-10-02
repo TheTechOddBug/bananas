@@ -1,6 +1,6 @@
 import { L } from '../translations'
 import { isMissingInviteError } from '../Utils'
-import { isWebRtcSdpError, type IceFailureReason } from './iceFailure'
+import { isTcpTurnUrl, isWebRtcSdpError, type IceFailureReason } from './iceFailure'
 
 const SDP_MESSAGE_MAX = 240
 
@@ -12,6 +12,9 @@ export const iceFailureText = (reason: IceFailureReason | null): string => {
     case 'auth':
       return L.connection_ice_auth({ url: serverLabel(reason.url), code: reason.code })
     case 'unreachable':
+      if (isTcpTurnUrl(reason.url)) {
+        return L.connection_ice_tcp_unreachable({ url: serverLabel(reason.url), code: reason.code })
+      }
       return L.connection_ice_unreachable({ url: serverLabel(reason.url), code: reason.code })
     case 'gathering-timeout':
       return L.connection_ice_gathering_timeout()

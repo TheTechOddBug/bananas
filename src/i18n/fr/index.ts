@@ -65,6 +65,7 @@ const fr = {
   connection_ice_auth:
     'Le serveur STUN ou TURN a refusé la connexion pour {url} (code {code}). Vérifiez le nom d’utilisateur et le mot de passe dans les réglages.',
   connection_ice_unreachable: 'Le serveur STUN ou TURN {url} est injoignable (code {code}).',
+  connection_ice_tcp_unreachable: 'Le serveur TURN TCP {url} est injoignable (code {code}).',
   connection_ice_gathering_timeout:
     'La recherche d’adresses a expiré avant qu’une adresse publique ou de relais n’apparaisse. Vérifiez le serveur STUN dans les réglages, ou ajoutez un serveur TURN.',
   connection_ice_host_only:

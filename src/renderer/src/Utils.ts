@@ -38,18 +38,26 @@ const fromBase64Url = (value: string): string => {
   return b64 + pad
 }
 
-const isTcpCandidateLine = (line: string): boolean => {
-  if (!line.startsWith('a=candidate:')) return false
+const candidateLineFields = (line: string): { protocol: string; type: string } | null => {
+  if (!line.startsWith('a=candidate:')) return null
   const parts = line.slice('a=candidate:'.length).split(/\s+/)
-  return parts[2]?.toLowerCase() === 'tcp'
+  const typIndex = parts.indexOf('typ')
+  return {
+    protocol: parts[2]?.toLowerCase() ?? '',
+    type: typIndex >= 0 ? (parts[typIndex + 1]?.toLowerCase() ?? '') : '',
+  }
 }
 
-const hasUdpCandidate = (lines: string[]): boolean =>
+const hasHostUdpCandidate = (lines: string[]): boolean =>
   lines.some((line) => {
-    if (!line.startsWith('a=candidate:')) return false
-    const parts = line.slice('a=candidate:'.length).split(/\s+/)
-    return parts[2]?.toLowerCase() === 'udp'
+    const fields = candidateLineFields(line)
+    return fields?.protocol === 'udp' && fields.type === 'host'
   })
+
+const isRedundantHostTcpLine = (line: string): boolean => {
+  const fields = candidateLineFields(line)
+  return fields?.protocol === 'tcp' && fields.type === 'host'
+}
 
 export const cloneForIpc = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
@@ -75,17 +83,18 @@ export const cloneIceCandidate = (candidate: RTCIceCandidateInit): RTCIceCandida
   usernameFragment: candidate.usernameFragment ?? undefined,
 })
 
-export const dropTcpIceCandidates = (
+/** Drop host/TCP only when host/UDP is already present. Relay and srflx TCP stay. */
+export const pruneRedundantIceCandidates = (
   desc: RTCSessionDescriptionInit,
 ): RTCSessionDescriptionInit => {
   const cloned = cloneSessionDescription(desc)
   if (!cloned.sdp) return cloned
   const newline = cloned.sdp.includes('\r\n') ? '\r\n' : '\n'
   const lines = cloned.sdp.split(/\r?\n/)
-  if (!hasUdpCandidate(lines)) return cloned
+  if (!hasHostUdpCandidate(lines)) return cloned
   return {
     type: cloned.type,
-    sdp: lines.filter((line) => !isTcpCandidateLine(line)).join(newline),
+    sdp: lines.filter((line) => !isRedundantHostTcpLine(line)).join(newline),
   }
 }
 
@@ -159,7 +168,10 @@ export const answerDescriptionForRemote = (
   local: RTCSessionDescriptionInit,
   remoteSdp?: string | null,
 ): RTCSessionDescriptionInit =>
-  dropUnusableIpv6IceCandidates(dropTcpIceCandidates(local), sdpHasUsableIpv6Candidate(remoteSdp))
+  dropUnusableIpv6IceCandidates(
+    pruneRedundantIceCandidates(local),
+    sdpHasUsableIpv6Candidate(remoteSdp),
+  )
 
 export const externalLinkClickHandler = (root: HTMLButtonElement, url: string): void => {
   root.classList.add('btn-disabled')
@@ -209,7 +221,7 @@ const sdpTypeForConnection = (ct: ConnectionType): RTCSdpType =>
   ct === ConnectionType.HOST ? 'offer' : 'answer'
 
 const encodeCompactPayload = (desc: RTCSessionDescriptionInit, type: RTCSdpType): string => {
-  const pruned = dropTcpIceCandidates(desc)
+  const pruned = pruneRedundantIceCandidates(desc)
   const compacted = compact({ type, sdp: pruned.sdp }, COMPACT_OPTIONS)
   return PAYLOAD_VERSION + compacted[0] + toBase64Url(compacted.slice(1))
 }

@@ -66,6 +66,7 @@ const en = {
     'Der STUN- oder TURN-Server hat die Anmeldung für {url} abgelehnt (Code {code}). Prüfe Benutzername und Passwort in den Einstellungen.',
   connection_ice_unreachable:
     'Der STUN- oder TURN-Server {url} war nicht erreichbar (Code {code}).',
+  connection_ice_tcp_unreachable: 'Der TCP-TURN-Server {url} war nicht erreichbar (Code {code}).',
   connection_ice_gathering_timeout:
     'Die Adresssuche endete, bevor eine öffentliche oder Relay-Adresse vorlag. Prüfe den STUN-Server in den Einstellungen oder füge einen TURN-Server hinzu.',
   connection_ice_host_only:

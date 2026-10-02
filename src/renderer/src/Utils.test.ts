@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   compressJson,
   decompressJson,
-  dropTcpIceCandidates,
+  pruneRedundantIceCandidates,
   dropUnusableIpv6IceCandidates,
   answerDescriptionForRemote,
   isUnusableIpv6IceCandidate,
@@ -111,12 +111,50 @@ describe('compressJson / decompressJson', () => {
   })
 })
 
-describe('dropTcpIceCandidates', () => {
-  it('removes TCP candidates when UDP candidates exist', () => {
-    const pruned = dropTcpIceCandidates(REALISTIC_OFFER)
-    expect(pruned.sdp).not.toMatch(/a=candidate:\S+\s+\d+\s+tcp\s/i)
-    expect(pruned.sdp).toMatch(/a=candidate:\S+\s+\d+\s+udp\s/i)
+describe('pruneRedundantIceCandidates', () => {
+  it('drops redundant host TCP when host UDP exists', () => {
+    const pruned = pruneRedundantIceCandidates(REALISTIC_OFFER)
+    expect(pruned.sdp).not.toMatch(/tcp .* typ host/i)
+    expect(pruned.sdp).toMatch(/udp .* typ host/i)
     expect(pruned.type).toBe('offer')
+  })
+
+  it('keeps relay TCP next to UDP candidates and keeps TCP-only descriptions', () => {
+    const mixed: RTCSessionDescriptionInit = {
+      type: 'offer',
+      sdp: [
+        'a=candidate:1 1 udp 2122260223 192.168.1.20 54321 typ host',
+        'a=candidate:2 1 tcp 1518280447 192.168.1.20 9 typ host tcptype active',
+        'a=candidate:3 1 udp 1686052607 203.0.113.10 54321 typ srflx',
+        'a=candidate:4 1 udp 41885439 203.0.113.50 59259 typ relay',
+        'a=candidate:5 1 tcp 25042943 203.0.113.51 9 typ relay tcptype passive',
+        '',
+      ].join('\r\n'),
+    }
+    const pruned = pruneRedundantIceCandidates(mixed)
+    expect(pruned.sdp).toMatch(/udp .* typ host/i)
+    expect(pruned.sdp).not.toMatch(/tcp .* typ host/i)
+    expect(pruned.sdp).toMatch(/udp .* typ srflx/i)
+    expect(pruned.sdp).toMatch(/udp .* typ relay/i)
+    expect(pruned.sdp).toMatch(/tcp .* typ relay/i)
+
+    const relays: RTCSessionDescriptionInit = {
+      type: 'offer',
+      sdp: [
+        'a=candidate:4 1 udp 41885439 203.0.113.50 59259 typ relay',
+        'a=candidate:5 1 tcp 25042943 203.0.113.51 9 typ relay tcptype passive',
+        '',
+      ].join('\r\n'),
+    }
+    const bothRelays = pruneRedundantIceCandidates(relays)
+    expect(bothRelays.sdp).toMatch(/udp .* typ relay/i)
+    expect(bothRelays.sdp).toMatch(/tcp .* typ relay/i)
+
+    const tcpOnly: RTCSessionDescriptionInit = {
+      type: 'offer',
+      sdp: 'a=candidate:1 1 tcp 1518280447 192.168.1.20 9 typ host tcptype active\r\n',
+    }
+    expect(pruneRedundantIceCandidates(tcpOnly).sdp).toMatch(/tcp .* typ host/i)
   })
 
   it('keeps SDP type from native-like descriptions whose fields are not enumerable', () => {
@@ -127,7 +165,7 @@ describe('dropTcpIceCandidates', () => {
       enumerable: false,
     })
     expect({ ...nativeLike }).toEqual({})
-    const pruned = dropTcpIceCandidates(nativeLike)
+    const pruned = pruneRedundantIceCandidates(nativeLike)
     expect(pruned.type).toBe('offer')
     expect(pruned.sdp).toMatch(/a=candidate:\S+\s+\d+\s+udp\s/i)
   })
@@ -277,6 +315,27 @@ describe('connection strings', () => {
     expect(signaled.sdp).toContain('fd6a:')
     expect(signaled.sdp).toContain('192.168.178.90')
     expect(signaled.sdp).not.toContain('fe80::1')
+  })
+
+  it('keeps relay TCP in an answer that also has host UDP', () => {
+    const answer: RTCSessionDescriptionInit = {
+      type: 'answer',
+      sdp: [
+        'a=candidate:1 1 udp 2122129151 192.168.178.90 45952 typ host',
+        'a=candidate:2 1 tcp 1518280447 192.168.178.90 9 typ host tcptype active',
+        'a=candidate:3 1 udp 41885439 203.0.113.50 59259 typ relay',
+        'a=candidate:4 1 tcp 25042943 203.0.113.51 9 typ relay tcptype passive',
+        '',
+      ].join('\r\n'),
+    }
+    const signaled = answerDescriptionForRemote(
+      answer,
+      'a=candidate:1 1 udp 1 192.168.1.20 9 typ host\r\n',
+    )
+    expect(signaled.sdp).toMatch(/udp .* typ host/i)
+    expect(signaled.sdp).not.toMatch(/tcp .* typ host/i)
+    expect(signaled.sdp).toMatch(/udp .* typ relay/i)
+    expect(signaled.sdp).toMatch(/tcp .* typ relay/i)
   })
 
   it('builds a compact kiwi:// participant URL', async () => {
