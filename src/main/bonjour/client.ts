@@ -23,22 +23,24 @@ import { BonjourServerErrorEnum } from './enums'
 const EVENTS_RECONNECT_MS = 2_000
 
 const tokenPath = (): string => join(app.getPath('userData'), 'bonjour-session.bin')
+const deskPath = (): string => join(app.getPath('userData'), 'bonjour-invite-desk.bin')
 
-const persistToken = (token: string | null): void => {
-  const file = tokenPath()
-  mkdirSync(app.getPath('userData'), { recursive: true })
-  if (!token) {
-    writeFileSync(file, Buffer.alloc(0), { mode: 0o600 })
-    return
-  }
-  const stored = safeStorage.isEncryptionAvailable()
-    ? safeStorage.encryptString(token)
-    : Buffer.from(token, 'utf8')
-  writeFileSync(file, stored, { mode: 0o600 })
+type InviteCode = { id: string; token: string; expiresAt: string }
+type InviteRedeemResult = {
+  callId: string
+  expiresAt: string
+  peer: { userId: string; username: string | null; devicePublicKey: string }
 }
 
-const readToken = (): string | null => {
-  const file = tokenPath()
+const persistToken = (token: string | null): void => {
+  writePacked(tokenPath(), token)
+}
+
+const persistDesk = (secret: string | null): void => {
+  writePacked(deskPath(), secret)
+}
+
+const readPacked = (file: string): string | null => {
   if (!existsSync(file)) return null
   const packed = readFileSync(file)
   if (!packed.length) return null
@@ -51,8 +53,26 @@ const readToken = (): string | null => {
   }
 }
 
+const writePacked = (file: string, value: string | null): void => {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  if (!value) {
+    writeFileSync(file, Buffer.alloc(0), { mode: 0o600 })
+    return
+  }
+  const stored = safeStorage.isEncryptionAvailable()
+    ? safeStorage.encryptString(value)
+    : Buffer.from(value, 'utf8')
+  writeFileSync(file, stored, { mode: 0o600 })
+}
+
+const readToken = (): string | null => readPacked(tokenPath())
+const readDesk = (): string | null => readPacked(deskPath())
+
 export class BonjourClient {
   private token: string | null = null
+  private deskSecret: string | null = null
+  private inviteCallIds = new Set<string>()
+  private deskChain: Promise<void> = Promise.resolve()
   private http: TrpcHttp | null = null
   private ws: WebSocket | null = null
   private heartbeat: ReturnType<typeof setInterval> | null = null
@@ -64,7 +84,7 @@ export class BonjourClient {
 
   attachWindow(win: BrowserWindow): void {
     this.window = win
-    if (this.token && this.serverUrl) this.openEvents()
+    if ((this.token || this.deskSecret) && this.serverUrl) this.openEvents()
   }
 
   private liveWindow(): BrowserWindow | null {
@@ -79,10 +99,19 @@ export class BonjourClient {
   }
 
   configured(serverUrl: string): void {
-    this.serverUrl = serverUrl.replace(/\/$/, '')
+    const next = serverUrl.replace(/\/$/, '')
+    const changed = Boolean(this.serverUrl) && this.serverUrl !== next
+    this.serverUrl = next
     this.http = new TrpcHttp(this.serverUrl)
     this.token = readToken()
-    if (this.token) this.openEvents()
+    if (changed) {
+      this.deskSecret = null
+      this.inviteCallIds.clear()
+      persistDesk(null)
+    } else if (!this.deskSecret) {
+      this.deskSecret = readDesk()
+    }
+    void this.ensureDesk()
   }
 
   async handleAuthUrl(url: string): Promise<void> {
@@ -94,7 +123,7 @@ export class BonjourClient {
     this.token = token
     persistToken(token)
     try {
-      this.openEvents()
+      await this.ensureDesk()
     } catch (error) {
       console.error('bonjour events', error)
     }
@@ -128,12 +157,59 @@ export class BonjourClient {
     this.token = null
     persistToken(null)
     this.disconnectEvents()
+    void this.ensureDesk()
     this.emit('bonjour:auth', null)
   }
 
   private require(): { token: string; http: TrpcHttp } {
     if (!this.token || !this.http) throw new Error('not signed in to Bonjour')
     return { token: this.token, http: this.http }
+  }
+
+  private requireDesk(): { secret: string; http: TrpcHttp } {
+    if (!this.deskSecret || !this.http) throw new Error('bonjour invites are not ready')
+    return { secret: this.deskSecret, http: this.http }
+  }
+
+  trackInviteCall(callId: string): void {
+    this.inviteCallIds.add(callId)
+  }
+
+  private enqueueDesk<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.deskChain.then(task, task)
+    this.deskChain = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
+  private async helloDesk(): Promise<void> {
+    await this.enqueueDesk(async () => {
+      if (!this.http) return
+      const { publicX } = this.identityKeys()
+      const result = await this.http.mutate<{ deskId: string; secret: string }>(
+        this.token,
+        'invites.hello',
+        { devicePublicKey: publicX },
+        this.deskSecret,
+      )
+      const secretChanged = result.secret !== this.deskSecret
+      this.deskSecret = result.secret
+      persistDesk(result.secret)
+      if (secretChanged && (this.token || this.deskSecret)) this.openEvents()
+    })
+  }
+
+  private async ensureDesk(): Promise<void> {
+    try {
+      await this.helloDesk()
+    } catch (error) {
+      console.error('bonjour invite desk', error)
+    }
+    if ((this.token || this.deskSecret) && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
+      this.openEvents()
+    }
   }
 
   private identityKeys(): { secret: string; publicX: string } {
@@ -275,6 +351,33 @@ export class BonjourClient {
     return http.mutate(token, 'lists.removeMember', { listId, peerId })
   }
 
+  async createInvite(): Promise<InviteCode> {
+    const { secret, http } = this.requireDesk()
+    return http.mutate(this.token, 'invites.create', {}, secret)
+  }
+
+  async listInvites(): Promise<InviteCode[]> {
+    const { secret, http } = this.requireDesk()
+    return http.query(this.token, 'invites.list', undefined, secret)
+  }
+
+  async revokeInvite(id: string): Promise<unknown> {
+    const { secret, http } = this.requireDesk()
+    return http.mutate(this.token, 'invites.revoke', { id }, secret)
+  }
+
+  async redeemInvite(token: string): Promise<InviteRedeemResult> {
+    const { secret, http } = this.requireDesk()
+    const result = await http.mutate<InviteRedeemResult>(
+      this.token,
+      'invites.redeem',
+      { token },
+      secret,
+    )
+    this.inviteCallIds.add(result.callId)
+    return result
+  }
+
   async startCall(peerId: string, kind: CallKind): Promise<{ callId: string }> {
     const { token, http } = this.require()
     return http.mutate(token, 'calls.start', { peerId, kind })
@@ -291,6 +394,10 @@ export class BonjourClient {
   }
 
   async hangup(callId: string): Promise<unknown> {
+    if (this.inviteCallIds.has(callId)) {
+      const { secret, http } = this.requireDesk()
+      return http.mutate(null, 'invites.hangup', { callId }, secret)
+    }
     const { token, http } = this.require()
     return http.mutate(token, 'calls.hangup', { callId })
   }
@@ -301,13 +408,17 @@ export class BonjourClient {
     peerPublicKey: string,
     payload: PlainSignal,
   ): Promise<unknown> {
-    const { token, http } = this.require()
     const { secret } = this.identityKeys()
     const ciphertext = encryptEnvelope({
       senderEd25519SecretB64: secret,
       recipientPublicKeyB64: peerPublicKey,
       payload,
     })
+    if (this.inviteCallIds.has(callId)) {
+      const desk = this.requireDesk()
+      return desk.http.mutate(null, 'invites.signal', { callId, type, ciphertext }, desk.secret)
+    }
+    const { token, http } = this.require()
     return http.mutate(token, 'calls.signal', { callId, type, ciphertext })
   }
 
@@ -324,6 +435,17 @@ export class BonjourClient {
       return payload.ciphertext
     }
     if (payload.ciphertextOmitted && typeof payload.id === 'string') {
+      const callId = typeof payload.callId === 'string' ? payload.callId : ''
+      if (this.inviteCallIds.has(callId) || !this.token) {
+        const { secret, http } = this.requireDesk()
+        const row = await http.query<{ ciphertext: string }>(
+          null,
+          'invites.getSignal',
+          { id: payload.id },
+          secret,
+        )
+        return row.ciphertext
+      }
       const { token, http } = this.require()
       const row = await http.query<{ ciphertext: string }>(token, 'calls.getSignal', {
         id: payload.id,
@@ -351,13 +473,13 @@ export class BonjourClient {
   }
 
   private openEvents(): void {
-    if (!this.token || !this.serverUrl) return
+    if (!this.serverUrl || (!this.token && !this.deskSecret)) return
     this.eventsGeneration += 1
     const generation = this.eventsGeneration
     this.clearEventsReconnect()
     this.ws?.close()
     this.ws = null
-    const wsUrl = eventsWsUrl(this.serverUrl, this.token)
+    const wsUrl = eventsWsUrl(this.serverUrl, { token: this.token, desk: this.deskSecret })
     const ws = new WebSocket(wsUrl)
     this.ws = ws
     ws.addEventListener('message', (event) => {
@@ -373,7 +495,7 @@ export class BonjourClient {
       if (this.ws === ws) this.ws = null
       this.clearEventsReconnect()
       this.eventsReconnect = setTimeout(() => {
-        if (generation !== this.eventsGeneration || !this.token) return
+        if (generation !== this.eventsGeneration || (!this.token && !this.deskSecret)) return
         this.openEvents()
       }, EVENTS_RECONNECT_MS)
     }
@@ -402,6 +524,7 @@ export class BonjourClient {
     this.stopHeartbeat()
     this.heartbeat = setInterval(() => {
       this.setPresence(this.presence === 'offline' ? 'available' : this.presence)
+      void this.helloDesk().catch((error) => console.error('bonjour invite desk', error))
     }, 30_000)
     this.setPresence(this.presence === 'offline' ? 'available' : this.presence)
   }

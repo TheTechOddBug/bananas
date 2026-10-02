@@ -35,24 +35,36 @@ export class TrpcHttp {
     return `${this.origin()}/trpc/${path}`
   }
 
-  private headers(token: string): HeadersInit {
-    return {
-      authorization: `Bearer ${token}`,
+  private headers(token: string | null, deskSecret?: string | null): HeadersInit {
+    const headers: Record<string, string> = {
       'content-type': 'application/json',
       origin: this.origin(),
     }
+    if (token) headers.authorization = `Bearer ${token}`
+    if (deskSecret) headers['x-bonjour-desk'] = deskSecret
+    return headers
   }
 
-  async query<T>(token: string, path: string, input?: unknown): Promise<T> {
+  async query<T>(
+    token: string | null,
+    path: string,
+    input?: unknown,
+    deskSecret?: string | null,
+  ): Promise<T> {
     const encoded = input === undefined ? '' : `?input=${encodeURIComponent(JSON.stringify(input))}`
-    const res = await fetch(this.url(path) + encoded, { headers: this.headers(token) })
+    const res = await fetch(this.url(path) + encoded, { headers: this.headers(token, deskSecret) })
     return this.read(res)
   }
 
-  async mutate<T>(token: string, path: string, input?: unknown): Promise<T> {
+  async mutate<T>(
+    token: string | null,
+    path: string,
+    input?: unknown,
+    deskSecret?: string | null,
+  ): Promise<T> {
     const res = await fetch(this.url(path), {
       method: 'POST',
-      headers: this.headers(token),
+      headers: this.headers(token, deskSecret),
       body: JSON.stringify(input ?? {}),
     })
     return this.read(res)

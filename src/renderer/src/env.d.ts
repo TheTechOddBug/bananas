@@ -230,6 +230,15 @@ type KiwiApi = {
     deleteList: (listId: string) => Promise<unknown>
     addListMember: (listId: string, peerId: string) => Promise<unknown>
     removeListMember: (listId: string, peerId: string) => Promise<unknown>
+    createInvite: () => Promise<{ id: string; token: string; expiresAt: string }>
+    listInvites: () => Promise<Array<{ id: string; token: string; expiresAt: string }>>
+    revokeInvite: (id: string) => Promise<unknown>
+    redeemInvite: (token: string) => Promise<{
+      callId: string
+      expiresAt: string
+      peer: { userId: string; username: string | null; devicePublicKey: string }
+    }>
+    trackInviteCall: (callId: string) => Promise<void>
     startCall: (peerId: string, kind: 'start' | 'join') => Promise<{ callId: string }>
     acceptCall: (callId: string) => Promise<unknown>
     rejectCall: (callId: string) => Promise<unknown>

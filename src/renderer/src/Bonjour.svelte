@@ -16,6 +16,7 @@
   import { BonjourServerErrorEnum } from '../../main/bonjour/enums'
   import { iceFailureText } from './session/connectionFailureText'
   import { recoverFailedConnection } from './session/recoverFailedConnection'
+  import { inviteTokenInput, normalizeInviteToken } from './session/inviteToken'
 
   const CONTACTS_POLL_MS = 30_000
 
@@ -51,6 +52,8 @@
   let outgoing = $state<Array<{ id: string; toUserId: string; username: string }>>([])
   let ignored = $state<Array<{ userId: string; username: string }>>([])
   // let lists = $state<Array<{ id: string; name: string; memberIds: string[] }>>([])
+  let invites = $state<Array<{ id: string; token: string; expiresAt: string }>>([])
+  let inviteDraft = $state('')
   let sessionStarted = $state(false)
   let outgoingCallId: string | null = null
   let peerKeys = new Map<string, string>()
@@ -186,6 +189,154 @@
     void room.dropBonjourCall(callId).then(() => maybeResetAfterCallClosed())
   }
 
+  const inviteErrorText = (error: unknown): string => {
+    const message = error instanceof Error ? error.message : ''
+    switch (message) {
+      case 'rate limited':
+        return L.bonjour_invite_rate_limited()
+      case 'invalid':
+        return L.bonjour_invite_invalid()
+      case 'expired':
+        return L.bonjour_invite_expired()
+      case 'used':
+        return L.bonjour_invite_used()
+      case 'revoked':
+        return L.bonjour_invite_revoked()
+      case 'own-token':
+        return L.bonjour_invite_own()
+      case 'offline':
+        return L.bonjour_invite_offline()
+      case 'no-device-key':
+      case 'invite desk required':
+      case 'bonjour invites are not ready':
+        return L.bonjour_invite_not_ready()
+      case 'room is full':
+        return L.bonjour_invite_full()
+      default:
+        return message || L.bonjour_error()
+    }
+  }
+
+  const refreshInvites = async (): Promise<void> => {
+    try {
+      invites = await window.KiwiApi.bonjour.listInvites()
+    } catch {
+      // The desk is still opening, or Bonjour is unreachable.
+    }
+  }
+
+  const canHostInvite = (): boolean => {
+    if (!sessionStarted && !room.isLive) return true
+    return room.isLive && room.isCoordinator && appState.sessionSource === 'bonjour'
+  }
+
+  const onCreateInvite = async (): Promise<void> => {
+    try {
+      await window.KiwiApi.bonjour.createInvite()
+      await refreshInvites()
+    } catch (error) {
+      toast.show('error', inviteErrorText(error))
+    }
+  }
+
+  const onCopyInvite = async (token: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(token)
+      toast.show('success', L.bonjour_invite_copied())
+    } catch (error) {
+      toast.show('error', inviteErrorText(error))
+    }
+  }
+
+  const onRevokeInvite = async (id: string): Promise<void> => {
+    try {
+      await window.KiwiApi.bonjour.revokeInvite(id)
+      await refreshInvites()
+    } catch (error) {
+      toast.show('error', inviteErrorText(error))
+    }
+  }
+
+  const onInviteRedeemed = async (event: {
+    callId: string
+    peerId: string
+    devicePublicKey: string
+    username: string | null
+  }): Promise<void> => {
+    await window.KiwiApi.bonjour.trackInviteCall(event.callId)
+    void refreshInvites()
+    if (!canHostInvite()) {
+      await window.KiwiApi.bonjour.hangup(event.callId).catch(() => undefined)
+      toast.show('error', L.bonjour_invite_unavailable())
+      return
+    }
+    let started = false
+    try {
+      signalingFailed = false
+      if (!room.isLive && !sessionStarted) {
+        const setup = await room.Setup(null, { captureDisplay: false })
+        if (setup !== 'ok') {
+          toast.show('error', L.connection_failed())
+          await window.KiwiApi.bonjour.hangup(event.callId).catch(() => undefined)
+          return
+        }
+        sessionStarted = true
+        started = true
+        appState.isHosting = true
+        appState.isCoordinator = true
+        appState.navigationEnabled = false
+        appState.beginSession('bonjour', reset)
+      }
+      registerCall(event.callId, event.peerId, event.devicePublicKey)
+      await room.startBonjourCall({ callId: event.callId, peerId: event.peerId })
+      flushPendingSignals()
+    } catch (error) {
+      toast.show('error', inviteErrorText(error))
+      await window.KiwiApi.bonjour.hangup(event.callId).catch(() => undefined)
+      if (callPeers.has(event.callId) || room.hasBonjourCall(event.callId)) closeCall(event.callId)
+      if (started && !room.isLive) {
+        await room.Disconnect()
+        reset()
+      }
+    }
+  }
+
+  const onRedeemInvite = async (): Promise<void> => {
+    const token = normalizeInviteToken(inviteDraft)
+    if (!token) {
+      toast.show('error', L.bonjour_invite_invalid())
+      return
+    }
+    if (sessionStarted || room.isLive) {
+      toast.show('error', L.bonjour_invite_busy())
+      return
+    }
+    try {
+      signalingFailed = false
+      const redeemed = await window.KiwiApi.bonjour.redeemInvite(token)
+      inviteDraft = ''
+      const setup = await room.Setup(document.createElement('video'))
+      if (setup !== 'ok') {
+        await window.KiwiApi.bonjour.hangup(redeemed.callId).catch(() => undefined)
+        toast.show('error', L.connection_failed())
+        return
+      }
+      appState.isWatching = true
+      appState.navigationEnabled = false
+      sessionStarted = true
+      appState.beginSession('bonjour', reset)
+      registerCall(redeemed.callId, redeemed.peer.userId, redeemed.peer.devicePublicKey)
+      await room.requestBonjourJoin({ callId: redeemed.callId, peerId: redeemed.peer.userId })
+      flushPendingSignals()
+    } catch (error) {
+      toast.show('error', inviteErrorText(error))
+      if (sessionStarted && !room.isLive && appState.sessionSource === 'bonjour') {
+        await room.Disconnect()
+        reset()
+      }
+    }
+  }
+
   onMount(() => {
     bonjourIncoming.accept = (): void => {
       void onAcceptCall()
@@ -211,10 +362,29 @@
         status?: string
         kind?: string
         senderId?: string
+        peerId?: string
+        username?: string | null
         signalType?: string
         devicePublicKey?: string | null
         ciphertextOmitted?: boolean
         plain?: BonjourSignalPayload | null
+      }
+      if (event.type === 'hangup' && event.callId) {
+        if (callPeers.has(event.callId) || room.hasBonjourCall(event.callId)) closeCall(event.callId)
+        else maybeResetAfterCallClosed()
+      }
+      if (
+        event.type === 'invite-redeemed' &&
+        event.callId &&
+        event.peerId &&
+        event.devicePublicKey
+      ) {
+        void onInviteRedeemed({
+          callId: event.callId,
+          peerId: event.peerId,
+          devicePublicKey: event.devicePublicKey,
+          username: typeof event.username === 'string' ? event.username : null,
+        })
       }
       if (event.type === 'incoming-call' && event.callId && event.fromUserId) {
         const kind = String(event.kind ?? 'start')
@@ -295,7 +465,9 @@
       }
     })
     void refresh()
+    void refreshInvites()
     const poll = setInterval(() => {
+      void refreshInvites()
       if ('error' in me === false && 'requestState' in me === false && !me?.username) return
       void refresh()
     }, CONTACTS_POLL_MS)
@@ -510,6 +682,41 @@
   // }
 </script>
 
+{#snippet invitePanel()}
+  <section class="mt-6 mb-6 max-w-md">
+    <h2 class="text-xl font-semibold mb-2">{L.bonjour_invites()}</h2>
+    <p class="mb-3 text-sm opacity-80">{L.bonjour_invites_description()}</p>
+    <button class="btn btn-accent btn-sm mb-3" onclick={() => void onCreateInvite()}>{L.bonjour_invite_create()}</button>
+    {#if invites.length}
+      <ul class="list bg-base-100 rounded-box shadow-md mb-4">
+        {#each invites as invite (invite.id)}
+          <li class="list-row flex flex-wrap gap-2 items-center">
+            <span class="font-mono tracking-widest">{invite.token}</span>
+            <span class="text-sm opacity-70">{L.bonjour_invite_expires()} {new Date(invite.expiresAt).toLocaleTimeString()}</span>
+            <button class="btn btn-sm" onclick={() => void onCopyInvite(invite.token)}>{L.bonjour_invite_copy()}</button>
+            <button class="btn btn-sm btn-ghost" onclick={() => void onRevokeInvite(invite.id)}>{L.bonjour_invite_revoke()}</button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <form class="join" onsubmit={(event) => { event.preventDefault(); void onRedeemInvite() }}>
+      <input
+        class="input join-item font-mono uppercase tracking-widest"
+        maxlength="8"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        value={inviteDraft}
+        oninput={(event) => {
+          inviteDraft = inviteTokenInput(event.currentTarget.value)
+        }}
+        placeholder={L.bonjour_invite_code()}
+      />
+      <button class="btn btn-primary join-item" type="submit">{L.bonjour_invite_join()}</button>
+    </form>
+  </section>
+{/snippet}
+
 <h1 class="text-3xl font-bold mb-4">{L.bonjour()}</h1>
 
 {#if sessionStarted && !room.isLive && !room.sessionEndedReason}
@@ -531,17 +738,20 @@
 {#if !me || ('error' in me === true && me.error === BonjourServerErrorEnum.SERVER_UNAUTHORIZED)}
   <p class="mb-4">{L.bonjour_sign_in_description()}</p>
   <button class="btn btn-primary" onclick={onLogin}>{L.bonjour_sign_in()}</button>
+  {@render invitePanel()}
 {:else if 'error' in me === false && 'requestState' in me === false && !me.username}
   <p class="mb-4">{L.bonjour_choose_username()}</p>
   <div class="join mb-4">
     <input class="input join-item" bind:value={usernameDraft} placeholder={L.username()} />
     <button class="btn btn-primary join-item" onclick={onClaim}>{L.save()}</button>
   </div>
+  {@render invitePanel()}
 {:else if 'error' in me === true}
   <div role="alert" class="alert alert-error text-xl">
     <i class="fa-solid fa-triangle-exclamation"></i>
     <span>{me.error}</span>
   </div>
+  {@render invitePanel()}
 {:else if 'requestState' in me === true}
   <div class="text-center">
     <span class="loading loading-spinner loading-xl text-info"></span>
@@ -588,6 +798,7 @@
       </div>
     {/each}
   {/if}
+    {@render invitePanel()}
     <h2 class="text-3xl">{L.bonjour_contacts()}</h2>
     <div class="bg-base-200 max-w-max rounded-box">
         <ul class="menu menu-horizontal">

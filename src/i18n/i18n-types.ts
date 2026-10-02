@@ -610,6 +610,86 @@ type RootTranslation = {
 	 */
 	bonjour_server_url: string
 	/**
+	 * I​n​v​i​t​e​ ​w​i​t​h​ ​a​ ​c​o​d​e
+	 */
+	bonjour_invites: string
+	/**
+	 * S​h​a​r​e​ ​a​ ​o​n​e​-​t​i​m​e​ ​c​o​d​e​ ​w​i​t​h​ ​s​o​m​e​o​n​e​ ​u​s​i​n​g​ ​t​h​i​s​ ​s​a​m​e​ ​B​o​n​j​o​u​r​ ​s​e​r​v​e​r​.​ ​S​i​g​n​i​n​g​ ​i​n​ ​i​s​ ​o​p​t​i​o​n​a​l​.
+	 */
+	bonjour_invites_description: string
+	/**
+	 * C​r​e​a​t​e​ ​i​n​v​i​t​e
+	 */
+	bonjour_invite_create: string
+	/**
+	 * C​o​p​y
+	 */
+	bonjour_invite_copy: string
+	/**
+	 * I​n​v​i​t​e​ ​c​o​d​e​ ​c​o​p​i​e​d
+	 */
+	bonjour_invite_copied: string
+	/**
+	 * R​e​v​o​k​e
+	 */
+	bonjour_invite_revoke: string
+	/**
+	 * J​o​i​n​ ​w​i​t​h​ ​c​o​d​e
+	 */
+	bonjour_invite_join: string
+	/**
+	 * I​n​v​i​t​e​ ​c​o​d​e
+	 */
+	bonjour_invite_code: string
+	/**
+	 * E​x​p​i​r​e​s
+	 */
+	bonjour_invite_expires: string
+	/**
+	 * T​o​o​ ​m​a​n​y​ ​i​n​v​i​t​e​ ​c​o​d​e​s​.​ ​W​a​i​t​ ​a​ ​m​i​n​u​t​e​ ​a​n​d​ ​t​r​y​ ​a​g​a​i​n​.
+	 */
+	bonjour_invite_rate_limited: string
+	/**
+	 * T​h​a​t​ ​i​n​v​i​t​e​ ​c​o​d​e​ ​i​s​ ​n​o​t​ ​v​a​l​i​d​.
+	 */
+	bonjour_invite_invalid: string
+	/**
+	 * T​h​a​t​ ​i​n​v​i​t​e​ ​c​o​d​e​ ​h​a​s​ ​e​x​p​i​r​e​d​.
+	 */
+	bonjour_invite_expired: string
+	/**
+	 * T​h​a​t​ ​i​n​v​i​t​e​ ​c​o​d​e​ ​w​a​s​ ​a​l​r​e​a​d​y​ ​u​s​e​d​.
+	 */
+	bonjour_invite_used: string
+	/**
+	 * T​h​a​t​ ​i​n​v​i​t​e​ ​c​o​d​e​ ​w​a​s​ ​r​e​v​o​k​e​d​.
+	 */
+	bonjour_invite_revoked: string
+	/**
+	 * Y​o​u​ ​c​a​n​n​o​t​ ​u​s​e​ ​y​o​u​r​ ​o​w​n​ ​i​n​v​i​t​e​ ​c​o​d​e​.
+	 */
+	bonjour_invite_own: string
+	/**
+	 * T​h​e​ ​p​e​r​s​o​n​ ​w​h​o​ ​c​r​e​a​t​e​d​ ​t​h​i​s​ ​c​o​d​e​ ​i​s​ ​o​f​f​l​i​n​e​.
+	 */
+	bonjour_invite_offline: string
+	/**
+	 * I​n​v​i​t​e​s​ ​a​r​e​ ​n​o​t​ ​r​e​a​d​y​ ​y​e​t​.​ ​T​r​y​ ​a​g​a​i​n​ ​i​n​ ​a​ ​m​o​m​e​n​t​.
+	 */
+	bonjour_invite_not_ready: string
+	/**
+	 * C​a​n​n​o​t​ ​a​d​d​ ​s​o​m​e​o​n​e​ ​t​o​ ​t​h​i​s​ ​s​e​s​s​i​o​n​.
+	 */
+	bonjour_invite_unavailable: string
+	/**
+	 * L​e​a​v​e​ ​t​h​e​ ​c​u​r​r​e​n​t​ ​s​e​s​s​i​o​n​ ​b​e​f​o​r​e​ ​j​o​i​n​i​n​g​ ​w​i​t​h​ ​a​ ​c​o​d​e​.
+	 */
+	bonjour_invite_busy: string
+	/**
+	 * T​h​i​s​ ​s​e​s​s​i​o​n​ ​i​s​ ​f​u​l​l​.
+	 */
+	bonjour_invite_full: string
+	/**
 	 * R​e​m​o​t​e​ ​c​o​n​t​r​o​l
 	 */
 	remote_control: string
@@ -1287,6 +1367,86 @@ export type TranslationFunctions = {
 	 * Bonjour server URL
 	 */
 	bonjour_server_url: () => LocalizedString
+	/**
+	 * Invite with a code
+	 */
+	bonjour_invites: () => LocalizedString
+	/**
+	 * Share a one-time code with someone using this same Bonjour server. Signing in is optional.
+	 */
+	bonjour_invites_description: () => LocalizedString
+	/**
+	 * Create invite
+	 */
+	bonjour_invite_create: () => LocalizedString
+	/**
+	 * Copy
+	 */
+	bonjour_invite_copy: () => LocalizedString
+	/**
+	 * Invite code copied
+	 */
+	bonjour_invite_copied: () => LocalizedString
+	/**
+	 * Revoke
+	 */
+	bonjour_invite_revoke: () => LocalizedString
+	/**
+	 * Join with code
+	 */
+	bonjour_invite_join: () => LocalizedString
+	/**
+	 * Invite code
+	 */
+	bonjour_invite_code: () => LocalizedString
+	/**
+	 * Expires
+	 */
+	bonjour_invite_expires: () => LocalizedString
+	/**
+	 * Too many invite codes. Wait a minute and try again.
+	 */
+	bonjour_invite_rate_limited: () => LocalizedString
+	/**
+	 * That invite code is not valid.
+	 */
+	bonjour_invite_invalid: () => LocalizedString
+	/**
+	 * That invite code has expired.
+	 */
+	bonjour_invite_expired: () => LocalizedString
+	/**
+	 * That invite code was already used.
+	 */
+	bonjour_invite_used: () => LocalizedString
+	/**
+	 * That invite code was revoked.
+	 */
+	bonjour_invite_revoked: () => LocalizedString
+	/**
+	 * You cannot use your own invite code.
+	 */
+	bonjour_invite_own: () => LocalizedString
+	/**
+	 * The person who created this code is offline.
+	 */
+	bonjour_invite_offline: () => LocalizedString
+	/**
+	 * Invites are not ready yet. Try again in a moment.
+	 */
+	bonjour_invite_not_ready: () => LocalizedString
+	/**
+	 * Cannot add someone to this session.
+	 */
+	bonjour_invite_unavailable: () => LocalizedString
+	/**
+	 * Leave the current session before joining with a code.
+	 */
+	bonjour_invite_busy: () => LocalizedString
+	/**
+	 * This session is full.
+	 */
+	bonjour_invite_full: () => LocalizedString
 	/**
 	 * Remote control
 	 */

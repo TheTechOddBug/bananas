@@ -405,6 +405,15 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('bonjour:removeListMember', async (_, listId: string, peerId: string) =>
     bonjourClient.removeListMember(listId, peerId),
   )
+  ipcMain.handle('bonjour:createInvite', async () => bonjourClient.createInvite())
+  ipcMain.handle('bonjour:listInvites', async () => bonjourClient.listInvites())
+  ipcMain.handle('bonjour:revokeInvite', async (_, id: string) => bonjourClient.revokeInvite(id))
+  ipcMain.handle('bonjour:redeemInvite', async (_, token: string) =>
+    bonjourClient.redeemInvite(token),
+  )
+  ipcMain.handle('bonjour:trackInviteCall', async (_, callId: string) => {
+    bonjourClient.trackInviteCall(callId)
+  })
   ipcMain.handle('bonjour:startCall', async (_, peerId: string, kind: CallKind) =>
     bonjourClient.startCall(peerId, kind),
   )

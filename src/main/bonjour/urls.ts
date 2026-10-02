@@ -8,9 +8,15 @@ export const isKiwiSdpUrl = (url: string): boolean => {
   return !isBonjourAuthUrl(url)
 }
 
-export const eventsWsUrl = (serverUrl: string, token: string): string => {
+export const eventsWsUrl = (
+  serverUrl: string,
+  auth: { token?: string | null; desk?: string | null },
+): string => {
   const base = serverUrl.replace(/\/$/, '')
-  return `${base.replace(/^http/, 'ws')}/events?token=${encodeURIComponent(token)}`
+  const url = new URL(`${base.replace(/^http/, 'ws')}/events`)
+  if (auth.token) url.searchParams.set('token', auth.token)
+  if (auth.desk) url.searchParams.set('desk', auth.desk)
+  return url.toString()
 }
 
 export const tokenFromBonjourAuthUrl = (url: string): string | null => {

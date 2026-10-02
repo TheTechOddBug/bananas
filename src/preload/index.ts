@@ -311,6 +311,11 @@ const KiwiApi = {
       ipcRenderer.invoke('bonjour:addListMember', listId, peerId),
     removeListMember: (listId: string, peerId: string) =>
       ipcRenderer.invoke('bonjour:removeListMember', listId, peerId),
+    createInvite: () => ipcRenderer.invoke('bonjour:createInvite'),
+    listInvites: () => ipcRenderer.invoke('bonjour:listInvites'),
+    revokeInvite: (id: string) => ipcRenderer.invoke('bonjour:revokeInvite', id),
+    redeemInvite: (token: string) => ipcRenderer.invoke('bonjour:redeemInvite', token),
+    trackInviteCall: (callId: string) => ipcRenderer.invoke('bonjour:trackInviteCall', callId),
     startCall: (peerId: string, kind: 'start' | 'join') =>
       ipcRenderer.invoke('bonjour:startCall', peerId, kind),
     acceptCall: (callId: string) => ipcRenderer.invoke('bonjour:acceptCall', callId),
