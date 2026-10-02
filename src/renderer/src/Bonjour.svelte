@@ -686,7 +686,7 @@
   <section class="mt-6 mb-6 max-w-md">
     <h2 class="text-xl font-semibold mb-2">{L.bonjour_invites()}</h2>
     <p class="mb-3 text-sm opacity-80">{L.bonjour_invites_description()}</p>
-    <button class="btn btn-accent btn-sm mb-3" onclick={() => void onCreateInvite()}>{L.bonjour_invite_create()}</button>
+    <button class="btn btn-accent mb-3" onclick={() => void onCreateInvite()}>{L.bonjour_invite_create()}</button>
     {#if invites.length}
       <ul class="list bg-base-100 rounded-box shadow-md mb-4">
         {#each invites as invite (invite.id)}
