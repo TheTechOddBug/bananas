@@ -1,12 +1,12 @@
 {
   "name": "p2p.kiwi",
-  "version": "3.9.1",
+  "version": "3.10.0",
   "description": "p2p.kiwi is a simple and easy-to-use screen sharing tool for Mac, Windows, and Linux.",
   "homepage": "https://p2p.kiwi",
   "license": "MIT",
   "author": {
-    "name": "Marco Kellershoff",
-    "email": "marco@kellershoff.net"
+    "name": "The Don't Be Evil Company",
+    "email": "marco@the-dont-be-evil-company.com"
   },
   "main": "./out/main/index.js",
   "scripts": {

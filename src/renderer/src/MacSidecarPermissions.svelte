@@ -57,33 +57,39 @@
   }
 </script>
 
-<div class="flex flex-col gap-2">
-  <p>{L.remote_control_permission_helper()}</p>
-  <p>
-    Accessibility: {post}. Input Monitoring: {listen}.
-  </p>
-  {#if restart}
-    <p>{L.remote_control_restart_required()}</p>
-  {/if}
-  <div class="flex flex-wrap gap-2">
-    {#if post !== 'granted'}
-      <button class="btn btn-sm" type="button" onclick={() => request('post')}>
-        {L.remote_control_request_permission()}
-      </button>
-      <button class="btn btn-sm" type="button" data-url={ACCESSIBILITY_URL} onclick={openSettings}>
-        {L.remote_control_open_accessibility()}
-      </button>
+<div class="flex flex-col gap-2 alert alert-warning alert-soft">
+  <div class="tooltip tooltip-top" data-tip={L.remote_control_permission_helper()}>
+    <p class="text-xl">
+      Accessibility: {post}
+    </p>
+    <p class="text-xl">
+      Input Monitoring: {listen}
+    </p>
+  </div>
+  <div class="flex flex-col gap-2">
+    {#if restart}
+      <p>{L.remote_control_restart_required()}</p>
     {/if}
-    {#if listen !== 'granted' && listen !== 'unavailable'}
-      <button class="btn btn-sm" type="button" onclick={() => request('listen')}>
-        {L.remote_control_request_listen()}
+    <div class="bg-warning p-2 rounded-lg flex gap-1 flex-wrap">
+      {#if post !== 'granted'}
+        <button class="btn btn-sm" type="button" onclick={() => request('post')}>
+          {L.remote_control_request_permission()}
+        </button>
+        <button class="btn btn-sm" type="button" data-url={ACCESSIBILITY_URL} onclick={openSettings}>
+          {L.remote_control_open_accessibility()}
+        </button>
+      {/if}
+      {#if listen !== 'granted' && listen !== 'unavailable'}
+        <button class="btn btn-sm" type="button" onclick={() => request('listen')}>
+          {L.remote_control_request_listen()}
+        </button>
+        <button class="btn btn-sm" type="button" data-url={LISTEN_URL} onclick={openSettings}>
+          {L.remote_control_open_input_monitoring()}
+        </button>
+      {/if}
+      <button class="btn btn-sm btn-secondary" type="button" onclick={() => refresh()}>
+        {L.remote_control_recheck()}
       </button>
-      <button class="btn btn-sm" type="button" data-url={LISTEN_URL} onclick={openSettings}>
-        {L.remote_control_open_input_monitoring()}
-      </button>
-    {/if}
-    <button class="btn btn-sm btn-ghost" type="button" onclick={() => refresh()}>
-      {L.remote_control_recheck()}
-    </button>
+    </div>
   </div>
 </div>
