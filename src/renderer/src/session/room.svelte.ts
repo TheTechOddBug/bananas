@@ -86,6 +86,12 @@ import {
 import { playSessionEndedSound } from './sessionEndedSound'
 import { playCursorPingSound } from './cursorPingSound'
 import {
+  ScreenRecorder,
+  downloadRecording,
+  type ScreenRecordingNotice,
+  type ScreenRecordingStart,
+} from './screenRecorder'
+import {
   dropPlaintextInbound,
   encryptionRequired,
   outboundCryptoAction,
@@ -129,6 +135,9 @@ export class Room {
   presenterId = $state('')
   peers = $state<RoomPeer[]>([])
   displayStreamActive = $state(false)
+  screenRecording = $state(false)
+  recordRemoteScreen = $state(false)
+  recordingNotice = $state<ScreenRecordingNotice | null>(null)
   remoteScreenActive = $state(false)
   /** Null until the presenter reports it. False means they paused the picture. */
   remoteDisplayActive = $state<boolean | null>(null)
@@ -184,6 +193,13 @@ export class Room {
   private remoteCameraState = new Map<string, { enabled: boolean; streamId: string }>()
   private remoteCameraStreams = new Map<string, MediaStream>()
   private remoteAudioElements = new Map<string, HTMLAudioElement>()
+  private screenRecorder: ScreenRecorder | null = null
+  private recordingFromPresenter = false
+  private recordingVideoTrack: MediaStreamTrack | null = null
+  private recordingStop: Promise<void> | null = null
+  private readonly onRecordedTrackEnded = (): void => {
+    void this.stopScreenRecording()
+  }
   private iceGraceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private voteTimer: ReturnType<typeof setTimeout> | null = null
   private cooldownUntil = 0
@@ -331,6 +347,100 @@ export class Room {
     if (!this.displayStreamActive) {
       this.ToggleRemoteCursors(false)
       void this.revokeAllRemoteControl('sharing-stopped')
+    }
+  }
+
+  clearRecordingNotice(): void {
+    this.recordingNotice = null
+  }
+
+  async startScreenRecording(): Promise<ScreenRecordingStart> {
+    if (this.screenRecording || this.recordingStop) return 'started'
+    if (!this.isPresenter && !this.recordRemoteScreen) return 'unavailable'
+    const track = this.screenRecordingSource()
+    if (!track) {
+      this.recordingNotice = 'failed'
+      return 'unavailable'
+    }
+    const recorder = new ScreenRecorder()
+    try {
+      recorder.start(track)
+      for (const [peerId, audio] of this.remoteAudioElements) {
+        const stream = audio.srcObject
+        if (stream instanceof MediaStream) recorder.setPeerAudio(peerId, stream)
+      }
+    } catch (error) {
+      debugLog.warn('room', 'screen recording failed to start', error)
+      try {
+        await recorder.stop()
+      } catch {
+        // The recorder may not have started.
+      }
+      this.recordingNotice = 'failed'
+      return 'failed'
+    }
+    this.screenRecorder = recorder
+    this.recordingFromPresenter = this.isPresenter
+    this.recordingVideoTrack = track
+    this.screenRecording = true
+    track.addEventListener('ended', this.onRecordedTrackEnded)
+    return 'started'
+  }
+
+  async stopScreenRecording(): Promise<void> {
+    if (this.recordingStop) return this.recordingStop
+    if (!this.screenRecorder) {
+      this.screenRecording = false
+      return
+    }
+    const task = this.finishScreenRecording()
+    this.recordingStop = task
+    try {
+      await task
+    } finally {
+      if (this.recordingStop === task) this.recordingStop = null
+    }
+  }
+
+  private screenRecordingSource(): MediaStreamTrack | null {
+    const stream = this.isPresenter ? this.displayStream : this.presenterDisplayStream()
+    if (!stream) return null
+    return stream.getVideoTracks().find((track) => track.readyState === 'live') ?? null
+  }
+
+  private syncRecordingAudio(peerId: string, stream: MediaStream | null): void {
+    try {
+      this.screenRecorder?.setPeerAudio(peerId, stream)
+    } catch (error) {
+      debugLog.warn('room', 'screen recording audio mix failed', error)
+    }
+  }
+
+  private async finishScreenRecording(): Promise<void> {
+    const recorder = this.screenRecorder
+    const track = this.recordingVideoTrack
+    this.screenRecorder = null
+    this.recordingVideoTrack = null
+    track?.removeEventListener('ended', this.onRecordedTrackEnded)
+    const keep = this.recordingFromPresenter || this.recordRemoteScreen
+    this.recordingFromPresenter = false
+    if (!recorder) {
+      this.screenRecording = false
+      return
+    }
+    try {
+      const blob = await recorder.stop()
+      if (blob.size > 0 && keep) {
+        downloadRecording(blob)
+        this.recordingNotice = 'saved'
+      } else if (blob.size === 0) {
+        this.recordingNotice = 'failed'
+      }
+    } catch (error) {
+      debugLog.warn('room', 'screen recording failed', error)
+      this.recordingNotice = 'failed'
+    } finally {
+      this.screenRecording = false
     }
   }
 
@@ -595,6 +705,7 @@ export class Room {
     this.remoteVideo = v
     this.localPeerId = getUUIDv4()
     this.microphoneActive = this.userSettings.isMicrophoneEnabledOnConnect
+    this.recordRemoteScreen = this.userSettings.recordRemoteScreen === true
     this.sessionEndedReason = null
     this.presenterGone = false
     this.quietClose = false
@@ -1500,7 +1611,9 @@ export class Room {
   private routableIpv6Promise: Promise<boolean> | null = null
 
   private routableIpv6(): Promise<boolean> {
-    this.routableIpv6Promise ??= window.KiwiApi.hasRoutableIpv6().catch(() => true)
+    this.routableIpv6Promise ??= Promise.resolve()
+      .then(() => window.KiwiApi.hasRoutableIpv6?.() ?? true)
+      .catch(() => true)
     return this.routableIpv6Promise
   }
 
@@ -2147,6 +2260,7 @@ export class Room {
     if (!stream) return
     const track = stream.getVideoTracks()[0]
     if (!track) return
+    await this.stopScreenRecording()
     this.stopStream(this.displayStream)
     this.displayStream = stream
     this.displayStreamActive = true
@@ -2183,6 +2297,7 @@ export class Room {
     for (const link of this.links.values()) {
       await link.setDisplayTrack(null, null)
     }
+    await this.stopScreenRecording()
     this.stopStream(this.displayStream)
     this.displayStream = null
     this.displayStreamActive = false
@@ -2418,6 +2533,7 @@ export class Room {
     void audio.play?.().catch((error) => {
       debugLog.warn('room', 'remote audio play failed', error)
     })
+    this.syncRecordingAudio(peerId, stream)
   }
 
   private onIceState(link: PeerLink, state: RTCIceConnectionState): void {
@@ -2516,6 +2632,7 @@ export class Room {
         audio.srcObject = null
         this.remoteAudioElements.delete(peerId)
       }
+      this.syncRecordingAudio(peerId, null)
       await this.dropVoterFromActiveVote(peerId)
     }
     if (this.quietClose) return
@@ -2623,6 +2740,7 @@ export class Room {
     if (pendingAudio) {
       this.remoteAudioElements.delete(link.pendingId)
       this.remoteAudioElements.set(remotePeerId, pendingAudio)
+      this.screenRecorder?.renamePeer(link.pendingId, remotePeerId)
     }
     if (this.handshakeKey === oldKey) this.handshakeKey = remotePeerId
   }
@@ -3058,11 +3176,9 @@ export class Room {
     }
     debugLog.info('share-surface', 'capture frame', detail)
     console.info('[share-surface] capture frame', detail)
-    const resolved = await window.KiwiApi.setShareDisplaySurface(
-      settings?.displaySurface,
-      frame.width,
-      frame.height,
-    )
+    const report = window.KiwiApi.setShareDisplaySurface
+    if (typeof report !== 'function') return
+    const resolved = await report(settings?.displaySurface, frame.width, frame.height)
     if (resolved !== 'monitor' && resolved !== 'window' && resolved !== 'browser') {
       debugLog.warn('share-surface', 'unresolved surface', { resolved })
       console.info('[share-surface] unresolved surface', { resolved })
@@ -3120,6 +3236,7 @@ export class Room {
     await this.setOverlayTemporarilyHidden(true)
     try {
       if (options?.releasePrevious) {
+        await this.stopScreenRecording()
         this.stopStream(this.displayStream)
         this.displayStream = null
       }
@@ -3155,16 +3272,32 @@ export class Room {
     }
   }
 
+  private capturePreview(): HTMLVideoElement | null {
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null
+    try {
+      const video = document.createElement('video')
+      const canWatch =
+        typeof video.requestVideoFrameCallback === 'function' ||
+        typeof video.addEventListener === 'function'
+      return canWatch ? video : null
+    } catch {
+      return null
+    }
+  }
+
+  private capturedFrame(track: MediaStreamTrack): { width: number; height: number } | 'cancelled' {
+    if (!displayCaptureReady(track)) return 'cancelled'
+    const settings = track.getSettings?.()
+    return { width: settings?.width ?? 0, height: settings?.height ?? 0 }
+  }
+
   private waitForCapturedDisplay(
     stream: MediaStream,
   ): Promise<{ width: number; height: number } | 'cancelled'> {
     const track = stream.getVideoTracks()[0]
     if (!track || track.readyState === 'ended') return Promise.resolve('cancelled')
-    if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
-      if (!displayCaptureReady(track)) return Promise.resolve('cancelled')
-      const settings = track.getSettings?.()
-      return Promise.resolve({ width: settings?.width ?? 0, height: 0 })
-    }
+    const video = this.capturePreview()
+    if (!video) return Promise.resolve(this.capturedFrame(track))
 
     const waiting = {
       readyState: track.readyState,
@@ -3175,7 +3308,6 @@ export class Room {
 
     return new Promise((resolve) => {
       let settled = false
-      const video = document.createElement('video')
       const finish = (result: { width: number; height: number } | 'cancelled'): void => {
         if (settled) return
         settled = true
@@ -3218,6 +3350,7 @@ export class Room {
   }
 
   private async teardown(quiet: boolean): Promise<void> {
+    await this.stopScreenRecording()
     this.quietClose = quiet
     this.clearVoteTimer()
     for (const timer of this.iceGraceTimers.values()) clearTimeout(timer)

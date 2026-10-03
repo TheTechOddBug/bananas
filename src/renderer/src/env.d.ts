@@ -144,6 +144,7 @@ type KiwiApi = {
     foregroundColor: string
     backgroundColor: string
     isMicrophoneEnabledOnConnect: boolean
+    recordRemoteScreen?: boolean
     hardwareVideoAcceleration: boolean
     debugLogsEnabled: boolean
     e2eeEnabled?: boolean
@@ -161,6 +162,7 @@ type KiwiApi = {
     backgroundColor: string
     language: string
     isMicrophoneEnabledOnConnect: boolean
+    recordRemoteScreen?: boolean
     hardwareVideoAcceleration: boolean
     debugLogsEnabled: boolean
     e2eeEnabled?: boolean

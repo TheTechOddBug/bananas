@@ -59,6 +59,10 @@ const en = {
   zoom_out: 'Zoom out',
   approve: 'Approve',
   change_screen: 'Change screen',
+  record_screen: 'Record screen',
+  stop_recording: 'Stop recording',
+  recording_saved: 'Recording saved',
+  recording_failed: 'Could not record the screen',
   connection_closed: 'Connection closed',
   connection_failed: 'Connection failed',
   connection_invite_missing:
@@ -101,6 +105,9 @@ const en = {
   vote_remove_rejected: 'Removal was declined',
   vote_remove_cooldown: 'Please wait a moment before starting another vote',
   you: 'You',
+  record_remote_screen: 'Record screens shared with you',
+  record_remote_screen_description:
+    'Saves a copy on this computer while you watch. The person sharing can always record. Off by default.',
   hardware_video_acceleration: 'Hardware video acceleration (VA-API)',
   hardware_video_acceleration_description:
     'Use the GPU to encode and decode video. Turn this off if screen sharing is black or crashes. Restart the app after changing.',

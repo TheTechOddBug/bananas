@@ -20,6 +20,7 @@ export type SettingsData = {
   backgroundColor: string
   language?: string
   isMicrophoneEnabledOnConnect: boolean
+  recordRemoteScreen?: boolean
   hardwareVideoAcceleration: boolean
   debugLogsEnabled: boolean
   e2eeEnabled?: boolean

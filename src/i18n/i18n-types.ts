@@ -238,6 +238,22 @@ type RootTranslation = {
 	 */
 	change_screen: string
 	/**
+	 * R​e​c​o​r​d​ ​s​c​r​e​e​n
+	 */
+	record_screen: string
+	/**
+	 * S​t​o​p​ ​r​e​c​o​r​d​i​n​g
+	 */
+	stop_recording: string
+	/**
+	 * R​e​c​o​r​d​i​n​g​ ​s​a​v​e​d
+	 */
+	recording_saved: string
+	/**
+	 * C​o​u​l​d​ ​n​o​t​ ​r​e​c​o​r​d​ ​t​h​e​ ​s​c​r​e​e​n
+	 */
+	recording_failed: string
+	/**
 	 * C​o​n​n​e​c​t​i​o​n​ ​c​l​o​s​e​d
 	 */
 	connection_closed: string
@@ -385,6 +401,14 @@ type RootTranslation = {
 	 * Y​o​u
 	 */
 	you: string
+	/**
+	 * R​e​c​o​r​d​ ​s​c​r​e​e​n​s​ ​s​h​a​r​e​d​ ​w​i​t​h​ ​y​o​u
+	 */
+	record_remote_screen: string
+	/**
+	 * S​a​v​e​s​ ​a​ ​c​o​p​y​ ​o​n​ ​t​h​i​s​ ​c​o​m​p​u​t​e​r​ ​w​h​i​l​e​ ​y​o​u​ ​w​a​t​c​h​.​ ​T​h​e​ ​p​e​r​s​o​n​ ​s​h​a​r​i​n​g​ ​c​a​n​ ​a​l​w​a​y​s​ ​r​e​c​o​r​d​.​ ​O​f​f​ ​b​y​ ​d​e​f​a​u​l​t​.
+	 */
+	record_remote_screen_description: string
 	/**
 	 * H​a​r​d​w​a​r​e​ ​v​i​d​e​o​ ​a​c​c​e​l​e​r​a​t​i​o​n​ ​(​V​A​-​A​P​I​)
 	 */
@@ -1004,6 +1028,22 @@ export type TranslationFunctions = {
 	 */
 	change_screen: () => LocalizedString
 	/**
+	 * Record screen
+	 */
+	record_screen: () => LocalizedString
+	/**
+	 * Stop recording
+	 */
+	stop_recording: () => LocalizedString
+	/**
+	 * Recording saved
+	 */
+	recording_saved: () => LocalizedString
+	/**
+	 * Could not record the screen
+	 */
+	recording_failed: () => LocalizedString
+	/**
 	 * Connection closed
 	 */
 	connection_closed: () => LocalizedString
@@ -1143,6 +1183,14 @@ export type TranslationFunctions = {
 	 * You
 	 */
 	you: () => LocalizedString
+	/**
+	 * Record screens shared with you
+	 */
+	record_remote_screen: () => LocalizedString
+	/**
+	 * Saves a copy on this computer while you watch. The person sharing can always record. Off by default.
+	 */
+	record_remote_screen_description: () => LocalizedString
 	/**
 	 * Hardware video acceleration (VA-API)
 	 */

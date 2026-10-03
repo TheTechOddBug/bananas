@@ -103,6 +103,7 @@ const KiwiApi = {
     backgroundColor: string
     language: string
     isMicrophoneEnabledOnConnect: boolean
+    recordRemoteScreen?: boolean
     hardwareVideoAcceleration: boolean
     debugLogsEnabled: boolean
     e2eeEnabled?: boolean
@@ -128,6 +129,7 @@ const KiwiApi = {
     foregroundColor: string
     backgroundColor: string
     isMicrophoneEnabledOnConnect: boolean
+    recordRemoteScreen?: boolean
     hardwareVideoAcceleration: boolean
     debugLogsEnabled: boolean
     e2eeEnabled?: boolean

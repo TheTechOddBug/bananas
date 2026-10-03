@@ -15,6 +15,7 @@ export type SettingsData = {
   backgroundColor: string
   language: string
   isMicrophoneEnabledOnConnect: boolean
+  recordRemoteScreen: boolean
   hardwareVideoAcceleration: boolean
   debugLogsEnabled: boolean
   e2eeEnabled: boolean
@@ -50,6 +51,7 @@ export const defaultSettings: SettingsData = {
   backgroundColor: '#0099ff',
   language: 'en',
   isMicrophoneEnabledOnConnect: true,
+  recordRemoteScreen: false,
   hardwareVideoAcceleration: true,
   debugLogsEnabled: false,
   e2eeEnabled: true,

@@ -56,6 +56,10 @@ const zh = {
   zoom_out: '缩小',
   approve: '同意',
   change_screen: '更换屏幕',
+  record_screen: '录制屏幕',
+  stop_recording: '停止录制',
+  recording_saved: '录制已保存',
+  recording_failed: '无法录制屏幕',
   connection_closed: '连接已关闭',
   connection_failed: '连接失败',
   connection_invite_missing: '此连接码缺少加密邀请。请粘贴完整文本，包括 # 之后的部分。',
@@ -95,6 +99,9 @@ const zh = {
   vote_remove_rejected: '移除请求被拒绝',
   vote_remove_cooldown: '请稍后再发起投票',
   you: '你',
+  record_remote_screen: '录制别人共享给你的屏幕',
+  record_remote_screen_description:
+    '观看时在这台电脑上保存一份。正在共享的人始终可以录制。默认关闭。',
   hardware_video_acceleration: '硬件视频加速（VA-API）',
   hardware_video_acceleration_description:
     '使用 GPU 编码和解码视频。如果屏幕共享黑屏或崩溃，请关闭此项。更改后需要重启应用。',

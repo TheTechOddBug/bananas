@@ -393,6 +393,19 @@
     if (result === 'failed') toast.show('error', L.screen_share_failed())
   }
 
+  const onToggleRecording = (): void => {
+    if (room.screenRecording) void room.stopScreenRecording()
+    else void room.startScreenRecording()
+  }
+
+  $effect(() => {
+    const notice = room.recordingNotice
+    if (!notice) return
+    if (notice === 'saved') toast.show('success', L.recording_saved())
+    else toast.show('error', L.recording_failed())
+    room.clearRecordingNotice()
+  })
+
   let inviteAnotherButton: HTMLButtonElement | undefined = $state()
   let inviteAnotherTextLoading = $state('')
 
@@ -490,6 +503,20 @@
   )
 </script>
 
+{#snippet recordButton()}
+  <button
+    title={room.screenRecording ? L.stop_recording() : L.record_screen()}
+    aria-label={room.screenRecording ? L.stop_recording() : L.record_screen()}
+    class="btn {room.screenRecording ? 'btn-error' : ''}"
+    onclick={onToggleRecording}
+  >
+    <span class="icon">
+      <i class="fa-solid {room.screenRecording ? 'fa-stop' : 'fa-circle'}"></i>
+    </span>
+    <span>{room.screenRecording ? L.stop_recording() : L.record_screen()}</span>
+  </button>
+{/snippet}
+
 <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
   <div class="flex gap-2 flex-wrap">
     {#if room.isPresenter}
@@ -502,6 +529,9 @@
           <i class="fa-solid fa-display"></i>
         </span>
       </button>
+      {#if room.displayStreamActive || room.screenRecording}
+        {@render recordButton()}
+      {/if}
       {#if room.displayStreamActive}
         <button class="btn btn-info" onclick={onChangeScreen}>
           <span class="icon">
@@ -532,6 +562,9 @@
       >
         <span>{L.request_to_present()}</span>
       </button>
+      {#if room.recordRemoteScreen && (room.remoteScreenActive || room.screenRecording)}
+        {@render recordButton()}
+      {/if}
       {#if room.remoteScreenActive}
         <button
           class="btn {controlling ? 'btn-success' : 'btn-warning'}"

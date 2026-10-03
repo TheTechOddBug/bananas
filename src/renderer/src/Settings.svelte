@@ -18,6 +18,7 @@
   let modalSuccessIsActive = $state(false)
   let modalFailureIsActive = $state(false)
   let isMicrophoneEnabledOnConnect = $state(true)
+  let recordRemoteScreen = $state(false)
   let hardwareVideoAcceleration = $state(true)
   let debugLogsEnabled = $state(false)
   let e2eeEnabled = $state(true)
@@ -68,6 +69,7 @@
         backgroundColor: backgroundValue,
         language,
         isMicrophoneEnabledOnConnect,
+        recordRemoteScreen,
         hardwareVideoAcceleration,
         debugLogsEnabled,
         e2eeEnabled,
@@ -107,6 +109,7 @@
       backgroundValue = settings.backgroundColor
       language = settings.language
       isMicrophoneEnabledOnConnect = settings.isMicrophoneEnabledOnConnect
+      recordRemoteScreen = settings.recordRemoteScreen === true
       hardwareVideoAcceleration = settings.hardwareVideoAcceleration
       debugLogsEnabled = settings.debugLogsEnabled
       e2eeEnabled = settings.e2eeEnabled !== false
@@ -243,6 +246,17 @@
       />
       {L.is_microphone_active_on_connect()}
     </label>
+
+    <label class="label cursor-pointer justify-start gap-2">
+      <input
+        bind:checked={recordRemoteScreen}
+        class="checkbox"
+        type="checkbox"
+        id="record_remote_screen"
+      />
+      {L.record_remote_screen()}
+    </label>
+    <p class="label">{L.record_remote_screen_description()}</p>
 
     {#if isLinux}
       <label class="label cursor-pointer justify-start gap-2">

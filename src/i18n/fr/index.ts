@@ -58,6 +58,10 @@ const fr = {
   zoom_out: 'Dézoomer',
   approve: 'Approuver',
   change_screen: 'Changer d’écran',
+  record_screen: 'Enregistrer l’écran',
+  stop_recording: 'Arrêter l’enregistrement',
+  recording_saved: 'Enregistrement sauvegardé',
+  recording_failed: 'Impossible d’enregistrer l’écran',
   connection_closed: 'Connexion fermée',
   connection_failed: 'Échec de la connexion',
   connection_invite_missing:
@@ -100,6 +104,9 @@ const fr = {
   vote_remove_rejected: 'Le retrait a été refusé',
   vote_remove_cooldown: 'Veuillez patienter un instant avant de lancer un autre vote',
   you: 'Vous',
+  record_remote_screen: 'Enregistrer les écrans partagés avec vous',
+  record_remote_screen_description:
+    'Enregistre une copie sur cet ordinateur pendant que vous regardez. La personne qui partage peut toujours enregistrer. Désactivé par défaut.',
   hardware_video_acceleration: 'Accélération vidéo matérielle (VA-API)',
   hardware_video_acceleration_description:
     'Utilise le GPU pour encoder et décoder la vidéo. Désactivez cette option si le partage d’écran est noir ou plante. Redémarrez l’application après modification.',

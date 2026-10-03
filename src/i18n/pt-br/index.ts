@@ -58,6 +58,10 @@ const pt_br = {
   zoom_out: 'Diminuir o Zoom',
   approve: 'Aprovar',
   change_screen: 'Trocar tela',
+  record_screen: 'Gravar tela',
+  stop_recording: 'Parar gravação',
+  recording_saved: 'Gravação salva',
+  recording_failed: 'Não foi possível gravar a tela',
   connection_closed: 'Conexão encerrada',
   connection_failed: 'Falha na conexão',
   connection_invite_missing:
@@ -102,6 +106,9 @@ const pt_br = {
   vote_remove_rejected: 'A remoção foi recusada',
   vote_remove_cooldown: 'Aguarde um momento antes de iniciar outra votação',
   you: 'Você',
+  record_remote_screen: 'Gravar telas compartilhadas com você',
+  record_remote_screen_description:
+    'Salva uma cópia neste computador enquanto você assiste. Quem está compartilhando sempre pode gravar. Desligado por padrão.',
   hardware_video_acceleration: 'Aceleração de vídeo por hardware (VA-API)',
   hardware_video_acceleration_description:
     'Usa a GPU para codificar e decodificar vídeo. Desative se o compartilhamento de tela ficar preto ou travar. Reinicie o aplicativo após alterar.',

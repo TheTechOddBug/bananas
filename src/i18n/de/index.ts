@@ -58,6 +58,10 @@ const en = {
   zoom_out: 'Herauszoomen',
   approve: 'Zustimmen',
   change_screen: 'Bildschirm wechseln',
+  record_screen: 'Bildschirm aufnehmen',
+  stop_recording: 'Aufnahme beenden',
+  recording_saved: 'Aufnahme gespeichert',
+  recording_failed: 'Bildschirm konnte nicht aufgenommen werden',
   connection_closed: 'Verbindung geschlossen',
   connection_failed: 'Verbindung fehlgeschlagen',
   connection_invite_missing:
@@ -102,6 +106,9 @@ const en = {
   vote_remove_rejected: 'Die Entfernung wurde abgelehnt',
   vote_remove_cooldown: 'Bitte warte einen Moment, bevor du eine neue Abstimmung startest',
   you: 'Du',
+  record_remote_screen: 'Geteilte Bildschirme aufnehmen',
+  record_remote_screen_description:
+    'Speichert eine Kopie auf diesem Computer, während du zusiehst. Wer den Bildschirm teilt, kann immer aufnehmen. Standardmäßig aus.',
   hardware_video_acceleration: 'Hardware-Videobeschleunigung (VA-API)',
   hardware_video_acceleration_description:
     'Nutzt die GPU zum Kodieren und Dekodieren von Video. Deaktiviere dies, wenn die Bildschirmfreigabe schwarz ist oder abstürzt. Starte die App danach neu.',
