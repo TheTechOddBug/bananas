@@ -242,6 +242,27 @@ type RootTranslation = {
 	 */
 	record_screen: string
 	/**
+	 * {​n​a​m​e​}​ ​w​a​n​t​s​ ​t​o​ ​r​e​c​o​r​d​ ​t​h​e​ ​s​c​r​e​e​n
+	 * @param {unknown} name
+	 */
+	recording_vote_request: RequiredParams<'name'>
+	/**
+	 * R​e​c​o​r​d​i​n​g​ ​w​a​s​ ​d​e​c​l​i​n​e​d
+	 */
+	recording_vote_rejected: string
+	/**
+	 * P​l​e​a​s​e​ ​w​a​i​t​ ​a​ ​m​o​m​e​n​t​ ​b​e​f​o​r​e​ ​a​s​k​i​n​g​ ​t​o​ ​r​e​c​o​r​d​ ​a​g​a​i​n
+	 */
+	recording_vote_cooldown: string
+	/**
+	 * A​ ​v​o​t​e​ ​i​s​ ​a​l​r​e​a​d​y​ ​i​n​ ​p​r​o​g​r​e​s​s
+	 */
+	recording_vote_blocked: string
+	/**
+	 * W​a​i​t​i​n​g​ ​f​o​r​ ​e​v​e​r​y​o​n​e​ ​t​o​ ​a​l​l​o​w​ ​r​e​c​o​r​d​i​n​g
+	 */
+	recording_vote_waiting: string
+	/**
 	 * S​t​o​p​ ​r​e​c​o​r​d​i​n​g
 	 */
 	stop_recording: string
@@ -1031,6 +1052,26 @@ export type TranslationFunctions = {
 	 * Record screen
 	 */
 	record_screen: () => LocalizedString
+	/**
+	 * {name} wants to record the screen
+	 */
+	recording_vote_request: (arg: { name: unknown }) => LocalizedString
+	/**
+	 * Recording was declined
+	 */
+	recording_vote_rejected: () => LocalizedString
+	/**
+	 * Please wait a moment before asking to record again
+	 */
+	recording_vote_cooldown: () => LocalizedString
+	/**
+	 * A vote is already in progress
+	 */
+	recording_vote_blocked: () => LocalizedString
+	/**
+	 * Waiting for everyone to allow recording
+	 */
+	recording_vote_waiting: () => LocalizedString
 	/**
 	 * Stop recording
 	 */

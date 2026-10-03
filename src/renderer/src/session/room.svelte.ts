@@ -1332,6 +1332,46 @@ export class Room {
     return 'ok'
   }
 
+  async requestScreenRecording(): Promise<'ok' | 'blocked' | 'cooldown' | 'unavailable'> {
+    if (this.screenRecording) {
+      await this.stopScreenRecording()
+      return 'ok'
+    }
+    if (!this.isPresenter && !this.recordRemoteScreen) return 'unavailable'
+    if (!this.screenRecordingSource()) {
+      this.recordingNotice = 'failed'
+      return 'unavailable'
+    }
+    const now = Date.now()
+    if (now < this.cooldownUntil) return 'cooldown'
+    if (this.activeVote || !this.localPeerId) return 'blocked'
+    const vote = startVote({
+      voteId: getUUIDv4(),
+      kind: 'record',
+      candidateId: this.localPeerId,
+      requesterId: this.localPeerId,
+      now,
+      timeoutMs: VOTE_TIMEOUT_MS,
+      peerIds: this.allPeerIds(),
+    })
+    this.activeVote = vote
+    this.localVoteCast = true
+    this.broadcast({
+      t: 'vote-start',
+      v: PROTOCOL_VERSION,
+      voteId: vote.voteId,
+      kind: vote.kind,
+      candidateId: vote.candidateId,
+      requesterId: vote.requesterId,
+      expiresAt: vote.expiresAt,
+    })
+    this.armVoteTimer(vote)
+    if (voteOutcome(vote, Date.now()) === 'approved') {
+      await this.concludeVote(vote, true)
+    }
+    return 'ok'
+  }
+
   clearVoteRejected(): void {
     this.voteRejectedKind = null
   }
@@ -2146,7 +2186,8 @@ export class Room {
 
   private onVoteStart(msg: Extract<ControlMessage, { t: 'vote-start' }>): void {
     if (this.activeVote && this.activeVote.voteId === msg.voteId) return
-    const kind = msg.kind === 'kick' ? 'kick' : 'presenter'
+    const kind: VoteKind =
+      msg.kind === 'kick' ? 'kick' : msg.kind === 'record' ? 'record' : 'presenter'
     const requesterId = msg.requesterId ?? msg.candidateId
     const vote = resumeVote({
       voteId: msg.voteId,
@@ -2178,6 +2219,7 @@ export class Room {
       if (msg.approved && msg.removedPeerId) await this.applyKick(msg.removedPeerId)
       return
     }
+    if (msg.kind === 'record') return
     if (msg.approved) await this.onPresenterChanged(msg.presenterId)
     else this.stopStream(this.pendingDisplayStream)
     this.pendingDisplayStream = null
@@ -2208,6 +2250,20 @@ export class Room {
         removedPeerId: approved ? vote.candidateId : '',
       })
       if (approved) await this.applyKick(vote.candidateId)
+      return
+    }
+    if (vote.kind === 'record') {
+      if (!approved) this.voteRejectedKind = 'record'
+      this.broadcast({
+        t: 'vote-result',
+        v: PROTOCOL_VERSION,
+        voteId: vote.voteId,
+        approved,
+        presenterId: this.presenterId,
+        kind: 'record',
+        removedPeerId: '',
+      })
+      if (approved) await this.startScreenRecording()
       return
     }
     if (approved) {

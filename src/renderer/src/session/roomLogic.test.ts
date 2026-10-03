@@ -121,6 +121,35 @@ describe('vote', () => {
     expect(castVote(afterAll, 'c', false)).toEqual(afterAll)
   })
 
+  it('requires every peer except the recorder to approve a recording', () => {
+    const vote = startVote({
+      voteId: 'r1',
+      kind: 'record',
+      candidateId: 'a',
+      requesterId: 'a',
+      now: 0,
+      timeoutMs: VOTE_TIMEOUT_MS,
+      peerIds: ['a', 'b', 'c'],
+    })
+    expect(vote.requiredVoterIds).toEqual(['b', 'c'])
+    expect(voteOutcome(vote, 1)).toBe('pending')
+    const afterB = castVote(vote, 'b', true)
+    expect(voteOutcome(afterB, 1)).toBe('pending')
+    expect(voteOutcome(castVote(afterB, 'c', false), 1)).toBe('rejected')
+    expect(voteOutcome(castVote(afterB, 'c', true), 1)).toBe('approved')
+    const alone = startVote({
+      voteId: 'r2',
+      kind: 'record',
+      candidateId: 'a',
+      requesterId: 'a',
+      now: 0,
+      timeoutMs: VOTE_TIMEOUT_MS,
+      peerIds: ['a'],
+    })
+    expect(alone.requiredVoterIds).toEqual([])
+    expect(voteOutcome(alone, 1)).toBe('approved')
+  })
+
   it('approves a two-person kick once the requester votes yes', () => {
     const vote = startVote({
       voteId: 'k2',

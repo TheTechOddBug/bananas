@@ -317,7 +317,14 @@
     const kind = room.voteRejectedKind
     if (!kind) return
     room.clearVoteRejected()
-    toast.show('info', kind === 'kick' ? L.vote_remove_rejected() : L.vote_rejected())
+    toast.show(
+      'info',
+      kind === 'kick'
+        ? L.vote_remove_rejected()
+        : kind === 'record'
+          ? L.recording_vote_rejected()
+          : L.vote_rejected(),
+    )
   })
 
   onMount(async () => {
@@ -393,9 +400,18 @@
     if (result === 'failed') toast.show('error', L.screen_share_failed())
   }
 
-  const onToggleRecording = (): void => {
-    if (room.screenRecording) void room.stopScreenRecording()
-    else void room.startScreenRecording()
+  const recordRequestPending = $derived(
+    room.activeVote?.kind === 'record' && room.activeVote.requesterId === room.localPeerId,
+  )
+
+  const onToggleRecording = async (): Promise<void> => {
+    if (room.screenRecording) {
+      await room.stopScreenRecording()
+      return
+    }
+    const result = await room.requestScreenRecording()
+    if (result === 'cooldown') toast.show('info', L.recording_vote_cooldown())
+    if (result === 'blocked') toast.show('info', L.recording_vote_blocked())
   }
 
   $effect(() => {
@@ -505,15 +521,30 @@
 
 {#snippet recordButton()}
   <button
-    title={room.screenRecording ? L.stop_recording() : L.record_screen()}
-    aria-label={room.screenRecording ? L.stop_recording() : L.record_screen()}
+    title={recordRequestPending
+      ? L.recording_vote_waiting()
+      : room.screenRecording
+        ? L.stop_recording()
+        : L.record_screen()}
+    aria-label={recordRequestPending
+      ? L.recording_vote_waiting()
+      : room.screenRecording
+        ? L.stop_recording()
+        : L.record_screen()}
     class="btn {room.screenRecording ? 'btn-error' : ''}"
+    disabled={recordRequestPending}
     onclick={onToggleRecording}
   >
     <span class="icon">
       <i class="fa-solid {room.screenRecording ? 'fa-stop' : 'fa-circle'}"></i>
     </span>
-    <span>{room.screenRecording ? L.stop_recording() : L.record_screen()}</span>
+    <span
+      >{recordRequestPending
+        ? L.recording_vote_waiting()
+        : room.screenRecording
+          ? L.stop_recording()
+          : L.record_screen()}</span
+    >
   </button>
 {/snippet}
 

@@ -7,6 +7,7 @@
   const vote = $derived(room.activeVote)
   const candidate = $derived(room.peers.find((peer) => peer.id === vote?.candidateId))
   const isKick = $derived(vote?.kind === 'kick')
+  const isRecord = $derived(vote?.kind === 'record')
   const isTarget = $derived(Boolean(vote && vote.candidateId === room.localPeerId))
   const showVote = $derived(Boolean(vote && room.localVoteCast === null && !isTarget))
   const showTargetNotice = $derived(Boolean(isKick && isTarget))
@@ -18,7 +19,9 @@
       <h3 class="font-bold text-lg">
         {isKick
           ? L.vote_remove({ name: candidate?.username ?? '' })
-          : L.vote_in_progress({ name: candidate?.username ?? '' })}
+          : isRecord
+            ? L.recording_vote_request({ name: candidate?.username ?? '' })
+            : L.vote_in_progress({ name: candidate?.username ?? '' })}
       </h3>
       <div class="modal-action">
         <button class="btn btn-error" onclick={() => room.castLocalVote(false)}>{L.deny()}</button>

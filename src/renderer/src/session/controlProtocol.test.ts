@@ -162,6 +162,21 @@ describe('controlProtocol', () => {
     })
   })
 
+  it('accepts a recording vote', () => {
+    const parsed = parseControlMessage(
+      JSON.stringify({
+        t: 'vote-start',
+        v: 1,
+        voteId: 'v1',
+        kind: 'record',
+        candidateId: 'a',
+        requesterId: 'a',
+        expiresAt: 10,
+      }),
+    )
+    expect(parsed).toMatchObject({ t: 'vote-start', kind: 'record', candidateId: 'a' })
+  })
+
   it('still accepts presenter votes without kind', () => {
     const parsed = parseControlMessage(
       JSON.stringify({

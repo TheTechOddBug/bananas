@@ -78,7 +78,7 @@ export type MeshAnswerMessage = Envelope & {
   sdp: RTCSessionDescriptionInit
 }
 
-export type VoteKind = 'presenter' | 'kick'
+export type VoteKind = 'presenter' | 'kick' | 'record'
 
 export type VoteStartMessage = Envelope & {
   t: 'vote-start'
@@ -228,7 +228,8 @@ const isRosterPeer = (value: unknown): value is RosterPeer => {
   )
 }
 
-const isVoteKind = (value: unknown): value is VoteKind => value === 'presenter' || value === 'kick'
+const isVoteKind = (value: unknown): value is VoteKind =>
+  value === 'presenter' || value === 'kick' || value === 'record'
 
 const isAppDomain = (value: unknown): value is AppDomain =>
   typeof value === 'string' && (APP_DOMAINS as string[]).includes(value)
